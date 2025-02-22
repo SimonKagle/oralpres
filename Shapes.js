@@ -385,6 +385,51 @@ class World {
         ];
     }
 
+    addCache(revealed){
+        if (this.offset_cache.length - this.block_count * 3 < revealed.length){
+            let newCache = new Float32Array(this.block_count * 3 + revealed.length);
+            for (let i = 0; i < newCache.length; i++){
+                if (i < this.block_count * 3){
+                    newCache[i] = this.offset_cache[i];
+                    if (i % 3 == 0){
+                        for (let j = 0; j < revealed.length; j += 3){
+                            if (this.offset_cache[i + 0] == revealed[j + 0] &&
+                                this.offset_cache[i + 1] == revealed[j + 1] &&
+                                this.offset_cache[i + 2] == revealed[j + 2]){
+                                revealed.splice(j, 3);
+                            }
+                        }
+                    }
+                } else if (i >= this.block_count * 3) {
+                    newCache[i] = revealed[i - this.block_count * 3];
+                }
+            }
+            this.offset_cache = newCache;
+
+        } else {
+
+            for (let i = 0; i < this.offset_cache.length; i += 3){
+                if (i < this.block_count * 3){
+                    for (let j = 0; j < revealed.length; j += 3){
+                        if (this.offset_cache[i + 0] == revealed[j + 0] &&
+                            this.offset_cache[i + 1] == revealed[j + 1] &&
+                            this.offset_cache[i + 2] == revealed[j + 2]){
+                            revealed.splice(j, 3);
+                        }
+                    }
+                } else {
+                    this.offset_cache[i + 0] = revealed[i + 0 - this.block_count * 3];
+                    this.offset_cache[i + 1] = revealed[i + 1 - this.block_count * 3];
+                    this.offset_cache[i + 2] = revealed[i + 2 - this.block_count * 3];
+                }
+            }
+        }
+
+        this.block_count += revealed.length / 3;
+
+
+    }
+
     changePoint(x, y, z, isBlock){
         var [gx, gy, gz] = this.point2Grid(x, y, z);
         let old = this.cubes[gz][gx][gy]
@@ -397,13 +442,8 @@ class World {
         let offsets = this.grid2point(gx, gy, gz);
         
         if (isBlock){
-            let newCache = Array.from(this.offset_cache.subarray(0, this.block_count * 3));
-
-            newCache.push(
-                ...offsets
-            );
-            this.offset_cache = new Float32Array(newCache);
-            this.block_count += 1;
+            this.addCache(offsets);
+            console.log(offsets, this.block_count);
         } else {
             // if (ind == -1){
             //     this.offset_cache = null;
@@ -439,7 +479,23 @@ class World {
                 this.block_count = 0;
             } else {
                 this.block_count -= 1;
+                let revealed = [];
+                for (let dx = -1; dx <= 1; dx++){
+                    for (let dy = -1; dy <= 1; dy++){
+                        for (let dz = -1; dz <= 1; dz++){
+                            if (dx != 0 && dy != 0 && dz != 0 ||
+                                dx == 0 && dy == 0 && dz == 0) continue;
+                            if (this.cubes[gz + dz][gx + dx][gy + dy]){
+                                revealed.push(...this.grid2point(gx + dx, gy + dy, gz + dz));
+                            }
+                        }
+                    }
+                }
+
+                this.addCache(revealed);
             }
+
+                
 
         }
 
@@ -452,6 +508,7 @@ class World {
      * @param {Camera} camera Current camera
      */
     cull(camera){
+        // TODO: Maybe only do this on offset cache?
         /*
         this.block_count = 0
         this.offset_cache = new Float32Array(this.total_blocks * 3);

@@ -17,14 +17,8 @@ uniform int u_doingInstances;
 attribute vec3 a_offset;
 void main() {
   if (u_doingInstances == 1){
-
-    if (
-      u_minAABB.x - 1. > a_offset.x || u_maxAABB.x + 1. < a_offset.x ||
-      u_minAABB.y - 1. > a_offset.y || u_maxAABB.y + 1. < a_offset.y ||
-      u_minAABB.z - 1. > a_offset.z || u_maxAABB.z + 1. < a_offset.z
-    ) return;
-
     gl_Position = u_ProjectionMatrix * u_ViewMatrix * (a_Position + vec4(a_offset, 0));
+    
     v_UV = a_UV;
   } else {
     gl_Position = u_ProjectionMatrix * u_ViewMatrix * u_ModelMatrix * a_Position;
@@ -335,20 +329,22 @@ function main() {
 
 function terrainHeight(x, y){
   let n = 0;
-  for (let iter = 1; iter <= 2; iter++){
+  for (let iter = 1; iter <= 1; iter++){
     let height = 10 / (1 << (iter));
     if (height < 2) break;
     n += Math.round(Math.sin(y * 0.1 + iter * 2.3) * height + height) + 
           Math.round(Math.sin(x * 0.1 + iter * 2.3) * height + height);
   }
+
+  n += 10;
   return Math.max(0, n);
 }
 
-const fullWorldSize = 700;
+const fullWorldSize = 450;
 
 function init_world(){
 
-  const wallHeight = 500;
+  const wallHeight = 5000;
   world[0] = Array(32).fill(wallHeight);
   world[31] = Array(32).fill(wallHeight);
   for (var y = 0; y < world.length; y++){

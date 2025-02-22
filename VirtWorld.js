@@ -338,7 +338,7 @@ function terrainHeight(x, y){
   return n;
 }
 
-const fullWorldSize = 1 << 9;
+const fullWorldSize = 350;
 
 function init_world(){
 
@@ -392,7 +392,6 @@ function renderScene(gl){
   ground.render(gl, a_Position, a_UV, u_ModelMatrix);
   gl.uniform1i(u_ColorSrc, 3);
 
-  // wObj.render(gl, a_Position, a_UV, u_ModelMatrix);
   let [minPt, maxPt] = camera.getAABB();
   gl.uniform3fv(u_maxAABB, maxPt.elements);
   gl.uniform3fv(u_minAABB, minPt.elements);

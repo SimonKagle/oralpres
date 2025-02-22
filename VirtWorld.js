@@ -335,11 +335,11 @@ function main() {
 
 function terrainHeight(x, y){
   let n = 0;
-  for (let iter = 1; iter <= 10; iter++){
-    let height = 20 / (1 << (iter));
+  for (let iter = 1; iter <= 2; iter++){
+    let height = 10 / (1 << (iter));
     if (height < 2) break;
-    n += Math.floor(Math.sin(y * 0.1 / height + iter * 2.3) * height + height) + 
-          Math.floor(Math.sin(x * 0.1 / height - iter * 2.3) * height + height);
+    n += Math.round(Math.sin(y * 0.1 + iter * 2.3) * height + height) + 
+          Math.round(Math.sin(x * 0.1 + iter * 2.3) * height + height);
   }
   return Math.max(0, n);
 }

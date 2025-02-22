@@ -336,7 +336,7 @@ class World {
 
 
         this.total_blocks = this.block_count;
-
+        console.log("Object done");
 
 
         this.cubeSize = cubeSize;
@@ -573,6 +573,8 @@ class World {
                             for (let dx = -1; dx <= 1; dx++){
                                 for (let dy = -1; dy <= 1; dy++){
                                     for (let dz = -1; dz <= 1; dz++){
+                                        if (dx != 0 && dy != 0 && dz != 0 ||
+                                            dx == 0 && dy == 0 && dz == 0) continue;
                                         let testx = x + dx;
                                         let testy = y + dy;
                                         let testz = z + dz;
@@ -602,6 +604,8 @@ class World {
                     }
                 }
             }
+
+            console.log("Cache done");
 
             this.offset_cache = new Float32Array(this.offset_cache);
 

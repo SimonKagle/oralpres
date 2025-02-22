@@ -130,7 +130,7 @@ function loadTexture(gl, texture, u_Sampler, image, num) {
   gl.bindTexture(gl.TEXTURE_2D, texture);
  
   // Set the texture parameters
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, !num ? gl.LINEAR : gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
@@ -338,7 +338,7 @@ function terrainHeight(x, y){
   return n;
 }
 
-const fullWorldSize = 350;
+const fullWorldSize = 700;
 
 function init_world(){
 
@@ -423,10 +423,6 @@ function renderScene(gl){
   cone1.render(gl, a_Position, u_FragColor, u_ModelMatrix);
   cone2.render(gl, a_Position, u_FragColor, u_ModelMatrix);
   cone3.render(gl, a_Position, u_FragColor, u_ModelMatrix);
-
-  let t = new Cube(new Matrix4(), [1, 0, 1], [cubeSize, cubeSize, cubeSize]);
-  t.matrix.translate(1, 1, 1);
-  t.render(gl, a_Position, u_FragColor, u_ModelMatrix);
 
   let curr_frame_time = performance.now() - start
   acc_frame_time += curr_frame_time;

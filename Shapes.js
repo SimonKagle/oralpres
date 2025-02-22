@@ -342,6 +342,8 @@ class World {
 
         this.cubeSize = cubeSize;
         this.inst = new TexCube(new Matrix4(), null, new Array(3).fill(this.cubeSize));
+        
+        /** @type {Float32Array} */
         this.offset_cache = null;
         this.offset_buffer_stale = true;
         this.offsetBuffer = null;
@@ -376,15 +378,73 @@ class World {
         ];
     }
 
+    grid2point(gx, gy, gz){
+        return [
+            (gx - this.cubes[gz].length / 2) * 2 * this.cubeSize, 
+            gy * 2 * this.cubeSize, 
+            (gz - this.cubes.length / 2) * 2 * this.cubeSize
+        ];
+    }
+
     changePoint(x, y, z, isBlock){
         var [gx, gy, gz] = this.point2Grid(x, y, z);
-        if (this.cubes[gz][gx][gy] == isBlock){
+        let old = this.cubes[gz][gx][gy]
+        if (this.cubes[gz][gx][gy] == isBlock || (!isBlock && !this.cubes[gz][gx][gy])){
             return;
         }
         this.cubes[gz][gx][gy] = isBlock;
-        this.offset_cache = null;
+
+        
+        let offsets = this.grid2point(gx, gy, gz);
+        
+        if (isBlock){
+            let newCache = Array.from(this.offset_cache.subarray(0, this.block_count * 3));
+
+            newCache.push(
+                ...offsets
+            );
+            this.offset_cache = new Float32Array(newCache);
+            this.block_count += 1;
+        } else {
+            // if (ind == -1){
+            //     this.offset_cache = null;
+            //     this.block_count = 0;
+            //     console.log(offsets, gx, gy, gz, old);
+            //     console.warn("Could not remove block");
+            // } else {
+            //     let newCache = Array.from(this.offset_cache)
+            //     newCache.splice(ind, 3);
+            //     this.offset_cache = new Float32Array(newCache);
+            //     this.block_count -= 1;
+            // }
+            let shifting = false;
+            for (let i = 0; i < this.offset_cache.length; i += 3){
+                if (this.offset_cache[i + 0] == offsets[0] &&
+                    this.offset_cache[i + 1] == offsets[1] &&
+                    this.offset_cache[i + 2] == offsets[2]){
+
+                    shifting = true;
+                }
+
+                if (shifting && i + 3 < this.offset_cache.length){
+                    this.offset_cache[i + 0] = this.offset_cache[i + 3];
+                    this.offset_cache[i + 1] = this.offset_cache[i + 4];
+                    this.offset_cache[i + 2] = this.offset_cache[i + 5];
+                }
+
+            }
+
+            if (!shifting){
+                console.warn("Could not remove block");
+                this.offset_cache = null;
+                this.block_count = 0;
+            } else {
+                this.block_count -= 1;
+            }
+
+        }
+
         this.offset_buffer_stale = true;
-        this.block_count = 0;
         this.total_blocks += isBlock ? 1 : -1;
     }
 
@@ -450,8 +510,8 @@ class World {
             }
         }
 
-        this.offset_cache = new Float32Array(this.offset_cache.slice(0, this.block_count * 3));
         this.offset_buffer_stale = true;
+        this.offset_cache = new Float32Array(this.offset_cache, 0, this.block_count * 3);
         */
     }
     
@@ -496,6 +556,7 @@ class World {
         gl.vertexAttribPointer(a_UV, 2, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(a_UV);
 
+
         if (this.offsetBuffer == null) this.offsetBuffer = gl.createBuffer();
         if(!this.offsetBuffer){
             throw new Error('Could not create UV buffer!');
@@ -508,11 +569,35 @@ class World {
                 for (var x = 0; x < this.cubes[z].length; x++){
                     for (var y = 0; y < this.cubes[z][x].length; y++){
                         if (this.cubes[z][x][y]){
-                            this.offset_cache.push(
-                                (x - this.cubes[z].length / 2) * 2 * this.cubeSize, 
-                                y * 2 * this.cubeSize, 
-                                (z - this.cubes.length / 2) * 2 * this.cubeSize
-                            );
+
+                            let fullyHidden = true;
+                            for (let dx = -1; dx <= 1; dx++){
+                                for (let dy = -1; dy <= 1; dy++){
+                                    for (let dz = -1; dz <= 1; dz++){
+                                        let testx = x + dx;
+                                        let testy = y + dy;
+                                        let testz = z + dz;
+                                        if (testy < 0) continue;
+                                        if (testx < 0 || testx >= this.cubes[z].length
+                                            || testz < 0 || testz >= this.cubes.length
+                                            || testy >= this.cubes[z][x].length
+                                            || !this.cubes[z + dz][x + dx][y + dy]) {
+                                            fullyHidden = false;
+                                            break;
+                                        }
+                                    }
+                                    if (!fullyHidden){
+                                        break;
+                                    }
+                                }
+                                if (!fullyHidden){
+                                    break;
+                                }
+                            }
+
+                            if (fullyHidden) continue;
+
+                            this.offset_cache.push(...this.grid2point(x, y, z));
                             this.block_count++;
                         }
                     }
@@ -525,7 +610,7 @@ class World {
 
         if (this.offset_buffer_stale){
             gl.bindBuffer(gl.ARRAY_BUFFER, this.offsetBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, this.offset_cache, gl.STREAM_DRAW);
+            gl.bufferData(gl.ARRAY_BUFFER, this.offset_cache.subarray(0, this.block_count * 3), gl.STREAM_DRAW);
             this.offset_buffer_stale = false;
         } else {
             gl.bindBuffer(gl.ARRAY_BUFFER, this.offsetBuffer);
@@ -536,7 +621,7 @@ class World {
         ext.vertexAttribDivisorANGLE(a_offset, 1);
 
         // gl.drawArraysInstanced(drawType, 0, n);
-        ext.drawArraysInstancedANGLE(gl.TRIANGLES, 0, this.inst.vertices.length / 3, this.offset_cache.length / 3);
+        ext.drawArraysInstancedANGLE(gl.TRIANGLES, 0, this.inst.vertices.length / 3, this.block_count);
 
         gl.uniform1i(u_doingInstances, 0);
         // console.log(gl.getBufferParameter(this.uvBuffer, gl.BUFFER_SIZE));

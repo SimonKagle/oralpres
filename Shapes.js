@@ -329,14 +329,13 @@ class World {
         for (var z = 0; z < blockHeights.length; z++){
             this.cubes.push([]);
             for (var x = 0; x < blockHeights[z].length; x++){
-                this.cubes[z].push([]);
-                for (var y = 0; y < blockHeights[z][x]; y++){
-                    this.cubes[z][x].push(true);
-                    this.block_count++;
-                    this.total_blocks++;
-                }
+                this.cubes[z].push(Array(blockHeights[z][x]).fill(true));
+                this.block_count += blockHeights[z][x];
             }
         }
+
+
+        this.total_blocks = this.block_count;
 
 
 

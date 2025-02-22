@@ -334,15 +334,21 @@ function main() {
 }
 
 function terrainHeight(x, y){
-  let n = Math.floor(Math.sin(y * 0.1) * 5 + 5) + Math.floor(Math.sin(x * 0.1) * 5 + 5);
-  return n;
+  let n = 0;
+  for (let iter = 1; iter <= 10; iter++){
+    let height = 20 / (1 << (iter));
+    if (height < 2) break;
+    n += Math.floor(Math.sin(y * 0.1 / height + iter * 2.3) * height + height) + 
+          Math.floor(Math.sin(x * 0.1 / height - iter * 2.3) * height + height);
+  }
+  return Math.max(0, n);
 }
 
 const fullWorldSize = 700;
 
 function init_world(){
 
-  const wallHeight = 1000;
+  const wallHeight = 500;
   world[0] = Array(32).fill(wallHeight);
   world[31] = Array(32).fill(wallHeight);
   for (var y = 0; y < world.length; y++){

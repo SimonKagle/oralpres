@@ -340,11 +340,11 @@ function terrainHeight(x, y){
   return Math.max(0, n);
 }
 
-const fullWorldSize = 450;
+const fullWorldSize = 700;
 
 function init_world(){
 
-  const wallHeight = 5000;
+  const wallHeight = 1000;
   world[0] = Array(32).fill(wallHeight);
   world[31] = Array(32).fill(wallHeight);
   for (var y = 0; y < world.length; y++){

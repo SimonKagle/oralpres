@@ -5,7 +5,10 @@
 var VSHADER_SOURCE =`
 attribute vec4 a_Position;
 attribute vec2 a_UV;
+attribute vec3 a_Normal;
 varying vec2 v_UV;
+varying vec3 v_Normal;
+varying vec4 v_vertPos;
 uniform mat4 u_ModelMatrix;
 uniform mat4 u_ViewMatrix;
 uniform mat4 u_ProjectionMatrix;
@@ -18,13 +21,13 @@ attribute vec3 a_offset;
 void main() {
   if (u_doingInstances == 1){
     gl_Position = u_ProjectionMatrix * u_ViewMatrix * (a_Position + vec4(a_offset, 0));
-    
-    v_UV = a_UV;
   } else {
     gl_Position = u_ProjectionMatrix * u_ViewMatrix * u_ModelMatrix * a_Position;
-    v_UV = a_UV;
   }
   
+  v_Normal = a_Normal;
+  v_UV = a_UV;
+  v_vertPos = (a_Position + vec4(a_offset, 0));
 }`;
 
 // Fragment shader program
@@ -34,19 +37,41 @@ uniform vec4 u_FragColor;
 uniform sampler2D u_Sampler0;
 uniform sampler2D u_Sampler1;
 uniform int u_colorSrc;
+
+uniform vec3 u_lightPos;
+uniform vec4 u_illumination;
+uniform vec3 u_cameraPos;
+
 varying vec2 v_UV;
+varying vec3 v_Normal;
+varying vec4 v_vertPos;
+
+vec4 k_ambient = vec4(.4, .4, .4, 1);
+vec4 k_specular = vec4(1, 1, 1, 1);
+float n_specular = 2.;
 
 void main() {
+  vec4 baseColor = vec4(0);
   if (u_colorSrc == 1) {
-    gl_FragColor = u_FragColor;
+    baseColor = vec4(v_Normal, 1.);
   } else if (u_colorSrc == 3){
-    gl_FragColor = texture2D(u_Sampler0, v_UV);
+    baseColor = texture2D(u_Sampler0, v_UV);
   } else if (u_colorSrc == 4){
-    gl_FragColor = texture2D(u_Sampler1, v_UV);
+    baseColor = texture2D(u_Sampler1, v_UV);
   }
+
+  vec3 lightVector = normalize(u_lightPos);
+  vec3 cameraVector = normalize(u_cameraPos - vec3(v_vertPos));
+  vec3 halfway = normalize(lightVector + cameraVector);
+  gl_FragColor = k_ambient;
+  gl_FragColor += u_illumination * max(0., dot(normalize(v_Normal), lightVector));
+  gl_FragColor += k_specular * u_illumination * pow(max(0., dot(normalize(v_Normal), halfway)), n_specular);
+  gl_FragColor *= baseColor;
 }`;
 
-let a_Position, a_UV, a_offset, u_ModelMatrix, u_FragColor, 
+let a_Position, a_UV, a_offset, a_Normal,
+    u_lightPos, u_cameraPos, u_illumination,
+    u_ModelMatrix, u_FragColor, 
     u_ViewMatrix, u_ProjectionMatrix, u_Sampler0,
     u_ColorSrc, u_Sampler1, u_doingInstances, u_minAABB, u_maxAABB;
 
@@ -214,12 +239,6 @@ const fpsText = document.getElementById("fps");
 const blockCountText = document.getElementById("blockCount");
 const totalCountText = document.getElementById("totalCount");
 
-
-let cone1 = new Cone(new Matrix4(), [1, 0, 0], .5, 2);
-let cone2 = new Cone(new Matrix4(), [0, 1, 0], .5, 1);
-let cone3 = new Cone(new Matrix4(), [0, 0, 1], .5, .5);
-let cat = new Cat();
-
 var ext;
 var ext2;
 
@@ -230,6 +249,7 @@ function main() {
   init_world();
 
   gl.enable(gl.DEPTH_TEST);
+  gl.enable(gl.CULL_FACE);
   gl.clearColor(.5, .75, 1, 1.0);
 
   ext = gl.getExtension('ANGLE_instanced_arrays');
@@ -245,14 +265,15 @@ function main() {
   // setInterval(() => console.log(ext2.getMemoryInfo()), 2000);
 
   
-  [[a_Position, a_UV, a_offset], 
+  [[a_Position, a_UV, a_offset, a_Normal], 
     [u_FragColor, u_ModelMatrix, u_ViewMatrix, 
      u_ProjectionMatrix, u_Sampler0, u_ColorSrc,
-     u_Sampler1, u_doingInstances, u_minAABB, u_maxAABB]] = connectVariablesToGLSL(
-      gl, ["a_Position", "a_UV", "a_offset"], 
+     u_Sampler1, u_doingInstances, u_minAABB, u_maxAABB,
+     u_lightPos, u_cameraPos, u_illumination]] = connectVariablesToGLSL(
+      gl, ["a_Position", "a_UV", "a_offset", "a_Normal"], 
       ["u_FragColor", "u_ModelMatrix", "u_ViewMatrix", 
        "u_ProjectionMatrix", "u_Sampler0", "u_colorSrc", "u_Sampler1",
-      "u_doingInstances", "u_minAABB", "u_maxAABB"]
+       "u_doingInstances", "u_minAABB", "u_maxAABB", "u_lightPos", "u_cameraPos", "u_illumination"]
   );
 
   camera = new Camera(canvas.width/canvas.height);
@@ -397,34 +418,9 @@ function renderScene(gl){
   let [minPt, maxPt] = camera.getAABB();
   gl.uniform3fv(u_maxAABB, maxPt.elements);
   gl.uniform3fv(u_minAABB, minPt.elements);
-  wObj.renderFast(gl, ext, a_Position, a_UV, a_offset, u_doingInstances);
+  wObj.renderFast(gl, ext, a_Position, a_UV, a_offset, a_Normal, u_doingInstances);
 
-  gl.uniform1i(u_ColorSrc, 1);
   // skybox.render(gl, a_Position, u_FragColor, u_ModelMatrix);
-
-  let catMat = new Matrix4();
-  catMat.translate(10, -.2, 0);
-  catMat.rotate(0.1 * Date.now(), 0, 1, 0);
-  catMat.translate(1, 0, 0);
-  cat.render(gl, catMat, 0.1 * Date.now(), a_Position, u_FragColor, u_ModelMatrix);
-
-  catMat.setTranslate(10, -.2, 0);
-  catMat.rotate(0.1 * Date.now() + 120, 0, 1, 0);
-  catMat.translate(1, 0, 0);
-  cat.render(gl, catMat, 0.1 * Date.now(), a_Position, u_FragColor, u_ModelMatrix);
-
-  catMat.setTranslate(10, -.2, 0);
-  catMat.rotate(0.1 * Date.now() + 240, 0, 1, 0);
-  catMat.translate(1, 0, 0);
-  cat.render(gl, catMat, 0.1 * Date.now(), a_Position, u_FragColor, u_ModelMatrix);
-
-  let adjTime = Date.now() * 0.001;
-  cone1.matrix.setTranslate(10, .1 * Math.sin(adjTime) + 1, 0);
-  cone2.matrix.setTranslate(10, .1 * Math.sin(adjTime + 1.5) + 2, 0);
-  cone3.matrix.setTranslate(10, .1 * Math.sin(adjTime + 3) + 3, 0);
-  cone1.render(gl, a_Position, u_FragColor, u_ModelMatrix);
-  cone2.render(gl, a_Position, u_FragColor, u_ModelMatrix);
-  cone3.render(gl, a_Position, u_FragColor, u_ModelMatrix);
 
   let curr_frame_time = performance.now() - start
   acc_frame_time += curr_frame_time;
@@ -433,6 +429,10 @@ function renderScene(gl){
   }
   blockCountText.innerText = wObj.block_count.toLocaleString();
   totalCountText.innerHTML = wObj.total_blocks.toLocaleString();
+
+  gl.uniform3f(u_cameraPos, ...camera.eye.elements);
+  gl.uniform3f(u_lightPos, 0, 5, 1);
+  gl.uniform4f(u_illumination, .5, .5, .5, 1);
 }
 
 var last_time = 0;

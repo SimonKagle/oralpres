@@ -65,9 +65,37 @@ varying vec4 v_diffuse;
 uniform mat4 u_CamViewMatrix;
 uniform mat4 u_CamProjectionMatrix;
 
+uniform int u_depthTexSize;
+
 vec4 k_ambient = vec4(.5, .5, .5, 1);
 vec4 k_specular = vec4(1, 1, 1, 1);
 float n_specular = 2.;
+
+mat3 kernel = mat3(1., 2., 1.,
+                   2., 3., 2.,
+                   1., 2., 1.);
+
+bool sampleShadow(vec3 p, vec2 offset){
+  vec2 texelSize = 1.0 / vec2(u_depthTexSize);
+  bool inRange = p.x > 1. || p.x < 0. 
+              || p.y > 1. || p.y < 0.;
+  
+  bool inShadow = texture2D(u_depthTex, p.xy + offset * texelSize).r < p.z - .00001;
+  
+  return inRange || inShadow;
+}
+
+float shadowAmnt(vec3 p){
+  float res = 0.0;
+  for (float i = -2.5; i <= 2.5; i++){
+    for (float j = -2.5; j <= 2.5; j++){
+      res += float(sampleShadow( p, vec2(i, j)));
+    }
+  }
+  return res / 64.;
+
+
+}
 
 void main() {
   vec4 baseColor = vec4(1);
@@ -82,15 +110,12 @@ void main() {
   vec4 projPoint1 = u_CamProjectionMatrix * u_CamViewMatrix * v_vertPos;
   vec3 projPoint = projPoint1.xyz / projPoint1.w;
   projPoint.xy = projPoint.xy;
-  bool inShadow = projPoint.x > 1. || projPoint.x < 0. 
-    || projPoint.y > 1. || projPoint.y < 0. 
-    || texture2D(u_depthTex, projPoint.xy).r < projPoint.z;
 
   vec3 lightVector = normalize(v_lightPos);
   vec3 cameraVector = normalize(u_cameraPos - vec3(v_vertPos));
   vec3 halfway = normalize(lightVector + cameraVector);
   gl_FragColor = k_ambient;
-  gl_FragColor += !inShadow ? vec4(1., 1., 1., 1.) : vec4(0., 0., 0., 1.);
+  gl_FragColor +=  (1. - shadowAmnt(projPoint.xyz)) * v_diffuse;
   // gl_FragColor += v_diffuse;
   // gl_FragColor += k_specular * v_illumination * pow(max(0., dot(normalize(v_Normal), halfway)), n_specular);
   gl_FragColor *= baseColor;
@@ -142,6 +167,7 @@ let gld = {
   u_depthTex: null,
   u_CamProjectionMatrix: null,
   u_CamViewMatrix: null,
+  u_depthTexSize: null,
 };
 
 /** @type {Camera} */
@@ -450,6 +476,7 @@ function main() {
     wObj.cull(camera);
   }
 
+  gl.uniform1i(gld.u_depthTexSize, lightSize)
   wObj.cull(camera);
   tick(gl);
 
@@ -474,7 +501,7 @@ let depthTex, depthFrameBuffer;
 
 function init_world(){
 
-  const wallHeight = 100;
+  const wallHeight = 10;
   world[0] = Array(32).fill(wallHeight);
   world[31] = Array(32).fill(wallHeight);
   for (var y = 0; y < world.length; y++){
@@ -495,11 +522,9 @@ function init_world(){
     }
   }
 
-  world = newWorld;
-
-  console.log(world);
-
-  wObj = new World([[1, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], cubeSize);
+  world = newWorld
+  // [[1, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
+  wObj = new World(newWorld, cubeSize);
 
   skybox = new Cube(new Matrix4(), [.5, .75, 1], [100, wallHeight, 100]);
 
@@ -515,14 +540,16 @@ let ground = new TexCube(new Matrix4().translate(0, -5, 0).scale(10, 1, 10), nul
 
 let acc_frame_time = 0;
 
-const lightSize = 1024;
-let light = new Light(new Vector4(.5, .5, .5, 1), new Camera(1));
+const lightSize = 1 << 12;
+let light = new Light(new Vector4(.5, .5, .5, 1), new Camera(1, true, 100));
 light.camera.panUp(90);
-light.camera.moveBackwards(1);
+light.camera.moveBackwards(100);
 // light.camera.moveBackwards(-.5);
 light.camera.panDown(90);
 light.camera.moveBackwards(1);
 light.camera.moveLeft(2);
+light.camera.panDown(-45);
+light.camera.panLeft(45)
 
 let shadow_gld = {
   a_Position: null,
@@ -539,6 +566,7 @@ let shadow_gld = {
  */
 function getShadowMap(gl){
 
+  gl.cullFace(gl.FRONT);
   gl.uniform1i(gld.u_colorSrc, 3);
   gl.uniform1i(gld.u_depthTex, 0);
   gl.bindFramebuffer(gl.FRAMEBUFFER, depthFrameBuffer);
@@ -548,6 +576,7 @@ function getShadowMap(gl){
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   wObj.renderFast(gl, ext, gld);
   ground.render(gl, gld.a_Position, gld.a_Normal, gld.a_UV, gld.u_ModelMatrix, gld.u_NormalMatrix);
+  gl.cullFace(gl.BACK);
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
@@ -599,7 +628,7 @@ function renderScene(gl){
       gl.UNSIGNED_SHORT,
       null
     );
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);

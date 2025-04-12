@@ -93,8 +93,8 @@ class Cube {
     baseNormals = [
          0,  1,  0,
          0, -1,  0,
-         0,  0,  1,
          0,  0, -1,
+         0,  0,  1,
         -1,  0,  0,
          1,  0,  0,
     ]
@@ -624,28 +624,18 @@ class World {
                         if (this.cubes[z][x][y]){
 
                             let fullyHidden = true;
-                            for (let dx = -1; dx <= 1; dx++){
-                                for (let dy = -1; dy <= 1; dy++){
-                                    for (let dz = -1; dz <= 1; dz++){
-                                        if (dx != 0 && dy != 0 && dz != 0 ||
-                                            dx == 0 && dy == 0 && dz == 0) continue;
-                                        let testx = x + dx;
-                                        let testy = y + dy;
-                                        let testz = z + dz;
-                                        if (testy < 0) continue;
-                                        if (testx < 0 || testx >= this.cubes[z].length
-                                            || testz < 0 || testz >= this.cubes.length
-                                            || testy >= this.cubes[z][x].length
-                                            || !this.cubes[z + dz][x + dx][y + dy]) {
-                                            fullyHidden = false;
-                                            break;
-                                        }
-                                    }
-                                    if (!fullyHidden){
-                                        break;
-                                    }
-                                }
-                                if (!fullyHidden){
+                            for (let side_check = 0; side_check < 6; side_check++){
+                                let sign = side_check % 2 * 2 - 1;
+                                let side = Math.floor(side_check / 2);
+                                let testx = x + (side == 0 ? sign : 0);
+                                let testy = y + (side == 1 ? sign : 0);
+                                let testz = z + (side == 2 ? sign : 0);
+                                if (testy < 0) continue;
+                                if (testx < 0 || testx >= this.cubes[z].length
+                                    || testz < 0 || testz >= this.cubes.length
+                                    || testy >= this.cubes[z][x].length
+                                    || !this.cubes[testz][testx][testy]) {
+                                    fullyHidden = false;
                                     break;
                                 }
                             }
@@ -658,6 +648,7 @@ class World {
                     }
                 }
             }
+
 
             console.log("Cache done");
 

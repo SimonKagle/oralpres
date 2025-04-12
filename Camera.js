@@ -69,9 +69,9 @@ class Camera {
                 throw new Error("You must specify a width if using orthographic projection");
             }
             let height = width / aspect;
-            this.projectionMatrix.ortho(
-                -width / 2, width / 2,
-                -height / 2, height / 2, 
+            this.projectionMatrix.setOrtho(
+                -width, width,
+                -height, height, 
                 0.1, 1000
             );
         }

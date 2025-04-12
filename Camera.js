@@ -43,7 +43,7 @@ function distPlane(plane, point){
 }
 
 class Camera {
-    constructor(aspect){
+    constructor(aspect, isOrtho, width){
         this.fov = 60;
         this.eye = new Vector3();
         this.at = new Vector3([0, 0, -1]);
@@ -57,12 +57,24 @@ class Camera {
         );
 
         this.projectionMatrix = new Matrix4();
-        this.projectionMatrix.perspective(
-            this.fov,
-            aspect,
-            0.1,
-            1000
-        );
+        if (!isOrtho){
+            this.projectionMatrix.perspective(
+                this.fov,
+                aspect,
+                0.1,
+                1000
+            );
+        } else {
+            if (width === undefined){
+                throw new Error("You must specify a width if using orthographic projection");
+            }
+            let height = width / aspect;
+            this.projectionMatrix.ortho(
+                -width / 2, width / 2,
+                -height / 2, height / 2, 
+                0.1, 1000
+            );
+        }
 
         this.inv_vp_matrix = new Matrix4(this.projectionMatrix);
         // this.inv_vp_matrix.multiply(this.viewMatrix);

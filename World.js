@@ -1,4 +1,3 @@
-
 class World {
 
     /**
@@ -9,12 +8,18 @@ class World {
         /**@type {Number} */
         this.block_count = 0;
         this.total_blocks = 0;
-        /**@type {Boolean[][][]} */
+        /**@type {number[][][]} */
         this.cubes = [];
         for (var z = 0; z < blockHeights.length; z++){
             this.cubes.push([]);
             for (var x = 0; x < blockHeights[z].length; x++){
-                this.cubes[z].push(Array(blockHeights[z][x]).fill(true));
+                this.cubes[z].push(Array(blockHeights[z][x]).fill(6).map((_, i) => {
+                    if (i == blockHeights[z][x] - 1) return 2;
+                    if (blockHeights[z][x] - i < 4) return 3;
+                    return 6;
+                }));
+                if (this.cubes[z][x].length > 0) this.cubes[z][x][this.cubes[z][x].length - 1] = 2;
+                // if(this.cubes[z].length > 0) this.cubes[z][this.cubes[z].length - 1] = 2;
                 this.block_count += blockHeights[z][x];
             }
         }
@@ -31,6 +36,9 @@ class World {
         this.offset_cache = null;
         this.offset_buffer_stale = true;
         this.offsetBuffer = null;
+
+        this.uvOffset_cache = null;
+        this.uvOffsetBuffer = null;
 
         this.uvBuffer = null;
         this.vertexBuffer = null;
@@ -72,46 +80,47 @@ class World {
     }
 
     addCache(revealed){
-        if (this.offset_cache.length - this.block_count * 3 < revealed.length){
-            let newCache = new Float32Array(this.block_count * 3 + revealed.length);
+        if (this.offset_cache.length - this.block_count * 4 < revealed.length){
+            let newCache = new Float32Array(this.block_count * 4 + revealed.length);
             for (let i = 0; i < newCache.length; i++){
-                if (i < this.block_count * 3){
+                if (i < this.block_count * 4){
                     newCache[i] = this.offset_cache[i];
-                    if (i % 3 == 0){
-                        for (let j = 0; j < revealed.length; j += 3){
+                    if (i % 4 == 0){
+                        for (let j = 0; j < revealed.length; j += 4){
                             if (this.offset_cache[i + 0] == revealed[j + 0] &&
                                 this.offset_cache[i + 1] == revealed[j + 1] &&
                                 this.offset_cache[i + 2] == revealed[j + 2]){
-                                revealed.splice(j, 3);
+                                revealed.splice(j, 4);
                             }
                         }
                     }
-                } else if (i >= this.block_count * 3) {
-                    newCache[i] = revealed[i - this.block_count * 3];
+                } else if (i >= this.block_count * 4) {
+                    newCache[i] = revealed[i - this.block_count * 4];
                 }
             }
             this.offset_cache = newCache;
 
         } else {
 
-            for (let i = 0; i < this.offset_cache.length; i += 3){
-                if (i < this.block_count * 3){
-                    for (let j = 0; j < revealed.length; j += 3){
+            for (let i = 0; i < this.offset_cache.length; i += 4){
+                if (i < this.block_count * 4){
+                    for (let j = 0; j < revealed.length; j += 4){
                         if (this.offset_cache[i + 0] == revealed[j + 0] &&
                             this.offset_cache[i + 1] == revealed[j + 1] &&
                             this.offset_cache[i + 2] == revealed[j + 2]){
-                            revealed.splice(j, 3);
+                            revealed.splice(j, 4);
                         }
                     }
                 } else {
-                    this.offset_cache[i + 0] = revealed[i + 0 - this.block_count * 3];
-                    this.offset_cache[i + 1] = revealed[i + 1 - this.block_count * 3];
-                    this.offset_cache[i + 2] = revealed[i + 2 - this.block_count * 3];
+                    this.offset_cache[i + 0] = revealed[i + 0 - this.block_count * 4];
+                    this.offset_cache[i + 1] = revealed[i + 1 - this.block_count * 4];
+                    this.offset_cache[i + 2] = revealed[i + 2 - this.block_count * 4];
+                    this.offset_cache[i + 3] = revealed[i + 3 - this.block_count * 4];
                 }
             }
         }
 
-        this.block_count += revealed.length / 3;
+        this.block_count += revealed.length / 4;
 
 
     }
@@ -126,6 +135,7 @@ class World {
 
         
         let offsets = this.grid2point(gx, gy, gz);
+        offsets.push(1);
         
         if (isBlock){
             this.addCache(offsets);
@@ -143,7 +153,7 @@ class World {
             //     this.block_count -= 1;
             // }
             let shifting = false;
-            for (let i = 0; i < this.offset_cache.length; i += 3){
+            for (let i = 0; i < this.offset_cache.length; i += 4){
                 if (this.offset_cache[i + 0] == offsets[0] &&
                     this.offset_cache[i + 1] == offsets[1] &&
                     this.offset_cache[i + 2] == offsets[2]){
@@ -151,10 +161,11 @@ class World {
                     shifting = true;
                 }
 
-                if (shifting && i + 3 < this.offset_cache.length){
-                    this.offset_cache[i + 0] = this.offset_cache[i + 3];
-                    this.offset_cache[i + 1] = this.offset_cache[i + 4];
-                    this.offset_cache[i + 2] = this.offset_cache[i + 5];
+                if (shifting && i + 4 < this.offset_cache.length){
+                    this.offset_cache[i + 0] = this.offset_cache[i + 4];
+                    this.offset_cache[i + 1] = this.offset_cache[i + 5];
+                    this.offset_cache[i + 2] = this.offset_cache[i + 6];
+                    this.offset_cache[i + 3] = this.offset_cache[i + 7];
                 }
 
             }
@@ -172,7 +183,7 @@ class World {
                             if (dx != 0 && dy != 0 && dz != 0 ||
                                 dx == 0 && dy == 0 && dz == 0) continue;
                             if (this.cubes[gz + dz][gx + dx][gy + dy]){
-                                revealed.push(...this.grid2point(gx + dx, gy + dy, gz + dz));
+                                revealed.push(...this.grid2point(gx + dx, gy + dy, gz + dz), this.cubes[gz + dz][gx + dx][gy + dy] - .5);
                             }
                         }
                     }
@@ -297,7 +308,6 @@ class World {
             gl.vertexAttribPointer(gld.a_UV, 2, gl.FLOAT, false, 0, 0);
             gl.enableVertexAttribArray(gld.a_UV);
 
-
             if (this.normalBuffer == null) {
                 this.normalBuffer = gl.createBuffer();
                 if(!this.normalBuffer){
@@ -311,16 +321,24 @@ class World {
             gl.bindBuffer(gl.ARRAY_BUFFER, this.normalBuffer);
             gl.vertexAttribPointer(gld.a_Normal, 3, gl.FLOAT, false, 0, 0);
             gl.enableVertexAttribArray(gld.a_Normal);
+
+            // if (this.uvOffsetBuffer == null) {
+            //     this.uvOffsetBuffer = gl.createBuffer();
+            //     if(!this.uvOffsetBuffer){
+            //         throw new Error('Could not create UV offset buffer!');
+            //     }
+            // }
         }
 
 
         if (this.offsetBuffer == null) this.offsetBuffer = gl.createBuffer();
         if(!this.offsetBuffer){
-            throw new Error('Could not create UV buffer!');
+            throw new Error('Could not create offset buffer!');
         }
 
         if (this.offset_cache == null){
             this.offset_cache = [];
+            this.uvOffset_cache = [];
             this.block_count = 0;
             for (var z = 0; z < this.cubes.length; z++){
                 for (var x = 0; x < this.cubes[z].length; x++){
@@ -346,7 +364,7 @@ class World {
 
                             if (fullyHidden) continue;
 
-                            this.offset_cache.push(...this.grid2point(x, y, z));
+                            this.offset_cache.push(...this.grid2point(x, y, z), (this.cubes[z][x][y] - 1) + 0.5);
                             this.block_count++;
                         }
                     }
@@ -357,25 +375,36 @@ class World {
             console.log("Cache done");
 
             this.offset_cache = new Float32Array(this.offset_cache);
+            this.uvOffset_cache = new Float32Array(this.uvOffset_cache);
 
         }
 
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.offsetBuffer);
         if (this.offset_buffer_stale){
-            gl.bindBuffer(gl.ARRAY_BUFFER, this.offsetBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, this.offset_cache.subarray(0, this.block_count * 3), gl.STREAM_DRAW);
-            this.offset_buffer_stale = false;
-        } else {
-            gl.bindBuffer(gl.ARRAY_BUFFER, this.offsetBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, this.offset_cache.subarray(0, this.block_count * 4), gl.STREAM_DRAW);
         }
 
-        gl.vertexAttribPointer(gld.a_offset, 3, gl.FLOAT, false, 0, 0);
+        gl.vertexAttribPointer(gld.a_offset, 4, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(gld.a_offset);
         ext.vertexAttribDivisorANGLE(gld.a_offset, 1);
+
+        // if (!depthOnly){
+        //     gl.bindBuffer(gl.ARRAY_BUFFER, this.uvOffsetBuffer);
+
+        //     if (this.offset_buffer_stale){
+        //         gl.bufferData(gl.ARRAY_BUFFER, this.uvOffset_cache.subarray(0, this.block_count), gl.STREAM_DRAW);
+        //     }
+
+        //     gl.vertexAttribPointer(gld.a_UVoffset, 1, gl.FLOAT, false, 0, 0);
+        //     gl.enableVertexAttribArray(gld.a_UVoffset);
+        //     ext.vertexAttribDivisorANGLE(gld.a_UVoffset, 1);
+        // }
 
         // gl.drawArraysInstanced(drawType, 0, n);
         ext.drawArraysInstancedANGLE(gl.TRIANGLES, 0, this.inst.vertices.length / 3, this.block_count);
 
         gl.uniform1i(gld.u_doingInstances, 0);
+        this.offset_buffer_stale = false;
         // console.log(gl.getBufferParameter(this.uvBuffer, gl.BUFFER_SIZE));
         // console.log(gl.getBufferParameter(this.offsetBuffer, gl.BUFFER_SIZE));
     }

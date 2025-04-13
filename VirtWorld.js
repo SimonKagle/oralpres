@@ -23,19 +23,16 @@ uniform vec4 u_illumination;
 varying vec4 v_illumination;
 
 varying vec4 v_diffuse;
+varying float v_tex;
 
 uniform int u_doingInstances;
-attribute vec3 a_offset;
+attribute vec4 a_offset;
 void main() {
-  // if (u_doingInstances == 1 && 
-  // (any(lessThan(a_offset + vec3(.5), u_minAABB)) || 
-  //  any(greaterThan(a_offset - vec3(.5), u_maxAABB)))){
-  //   return;
-  // }
-  v_vertPos = u_doingInstances == 1 ? (a_Position + vec4(a_offset, 0)) : u_ModelMatrix * a_Position;
+  v_vertPos = u_doingInstances == 1 ? (a_Position + vec4(a_offset.xyz, 0)) : u_ModelMatrix * a_Position;
   v_Normal = a_Normal;
-  v_UV = a_UV;
+  v_UV = vec2(a_UV.x, a_UV.y);
   gl_Position = u_ProjectionMatrix * u_ViewMatrix * v_vertPos;
+  v_tex = a_offset.w;
 
   vec3 lightVector = normalize(u_lightPos);
   v_diffuse =  u_illumination * max(0., dot(normalize(a_Normal), lightVector));
@@ -49,6 +46,11 @@ precision mediump float;
 uniform vec4 u_FragColor;
 uniform sampler2D u_Sampler0;
 uniform sampler2D u_Sampler1;
+uniform sampler2D u_Sampler2;
+uniform sampler2D u_Sampler3;
+uniform sampler2D u_Sampler4;
+uniform sampler2D u_Sampler5;
+
 uniform sampler2D u_depthTex;
 uniform int u_colorSrc;
 
@@ -61,6 +63,7 @@ varying vec3 v_Normal;
 varying vec4 v_vertPos;
 
 varying vec4 v_diffuse;
+varying float v_tex;
 
 uniform mat4 u_CamViewMatrix;
 uniform mat4 u_CamProjectionMatrix;
@@ -101,10 +104,21 @@ float shadowAmnt(vec3 p){
 
 void main() {
   vec4 baseColor = vec4(1);
-  if (u_colorSrc == 1) {
-    baseColor = vec4(v_Normal, 1.);
-  } else if (u_colorSrc == 3){
-    baseColor = texture2D(u_Sampler0, v_UV);
+  int tex = int(floor(v_tex));
+  if (u_colorSrc == 3){
+      if (tex == 0){
+        baseColor = texture2D(u_Sampler0, v_UV);
+      } else if (tex == 1){
+        baseColor = texture2D(u_Sampler1, v_UV);
+      } else if (tex == 2){
+        baseColor = texture2D(u_Sampler2, v_UV);
+      } else if (tex == 3){
+        baseColor = texture2D(u_Sampler3, v_UV);
+      } else if (tex == 4){
+        baseColor = texture2D(u_Sampler4, v_UV);
+      } else if (tex == 5){
+        baseColor = texture2D(u_Sampler5, v_UV);
+      }
   } else if (u_colorSrc == 4){
     baseColor = texture2D(u_Sampler1, v_UV);
   }
@@ -123,35 +137,13 @@ void main() {
   gl_FragColor *= baseColor;
 }`;
 
-var camShaders = [
-  `
-  attribute vec4 a_Position;
-  attribute vec3 a_offset;
-
-  uniform mat4 u_ModelMatrix;
-  uniform mat4 u_ProjectionMatrix;
-  uniform mat4 u_ViewMatrix;
-  uniform int u_doingInstances;
-
-  void main(){
-    gl_Position = u_ProjectionMatrix * u_ViewMatrix * (
-      u_doingInstances == 1 ? 
-        (a_Position + vec4(a_offset, 0)) :
-        u_ModelMatrix * a_Position
-    );
-  }
-  `,
-  `
-  void main(){}
-  `
-];
-
 
 let gld = {
   a_Position: null,
   a_UV: null,
   a_offset: null,
   a_Normal: null,
+  // a_UVoffset: null,
   u_lightPos: null,
   u_cameraPos: null,
   u_illumination: null,
@@ -160,8 +152,12 @@ let gld = {
   u_ViewMatrix: null, 
   u_ProjectionMatrix: null, 
   u_Sampler0: null,
+  u_Sampler1: null,
+  u_Sampler2: null,
+  u_Sampler3: null,
+  u_Sampler4: null,
+  u_Sampler5: null,
   u_colorSrc: null, 
-  u_Sampler1: null, 
   u_doingInstances: null, 
   u_minAABB: null, 
   u_maxAABB: null,
@@ -231,7 +227,7 @@ let ground = new TexCube(new Matrix4().translate(0, -5, 0).scale(10, 1, 10), nul
 
 let acc_frame_time = 0;
 
-const lightSize = 1 << 12;
+const lightSize = 1 << 14;
 let light = new Light(new Vector4([.5, .5, .5, 1]), new Camera(1, true, 200));
 light.camera.move(0, 50, 0);
 light.camera.panUp(45);
@@ -430,11 +426,6 @@ function main() {
     throw new Error("Could not create main shader!");
   }
 
-  shadowShader = createProgram(gl, camShaders[0], camShaders[1]);
-  if (!camShaders){
-    throw new Error("Could not create camera shader!");
-  }
-
   connectDataToGLSL(gl, mainShader, gld);
   gl.program = mainShader;
   gl.useProgram(mainShader);
@@ -444,6 +435,10 @@ function main() {
 
   initTextures(gl, "stonev2.png", gld.u_Sampler0, 0);
   initTextures(gl, "grassv2.png", gld.u_Sampler1, 1);
+  initTextures(gl, "tex/sprite_2.png", gld.u_Sampler2, 2);
+  initTextures(gl, "tex/sprite_3.png", gld.u_Sampler3, 3);
+  initTextures(gl, "tex/sprite_4.png", gld.u_Sampler4, 4);
+  initTextures(gl, "tex/stonev2-7.png", gld.u_Sampler5, 5);
 
   // Clear <canvas>
   clearCanvas(gl);
@@ -479,8 +474,10 @@ function main() {
   canvas.onmousedown = function(ev){
     if (ev.button == 0){
       wObj.changePoint(...camera.at.elements, false);
+      getShadowMap(gl);
     } else if (ev.button == 2){
       wObj.changePoint(...camera.at.elements, true);
+      getShadowMap(gl);
     }
     wObj.cull(camera);
   }
@@ -565,6 +562,8 @@ function init_world(){
  */
 function getShadowMap(gl){
 
+  console.log("getting shadows");
+
   gl.cullFace(gl.FRONT);
   gl.uniform1i(gld.u_colorSrc, 3);
   gl.uniform1i(gld.u_depthTex, 0);
@@ -582,11 +581,11 @@ function getShadowMap(gl){
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   gl.uniformMatrix4fv(gld.u_ProjectionMatrix, false, camera.projectionMatrix.elements);
   gl.uniformMatrix4fv(gld.u_ViewMatrix, false, camera.viewMatrix.elements);
-  
+  gl.uniform1i(gld.u_depthTex, 31);
 
-  return depthTex;
 }
 
+let firstRun = true;
 /**
  * Renders scene
  * @param {WebGLRenderingContext} gl 
@@ -596,7 +595,7 @@ function renderScene(gl){
   let start = performance.now();
 
   if (!depthTex || !depthFrameBuffer){
-    gl.activeTexture(gl.TEXTURE3);
+    gl.activeTexture(gl.TEXTURE31);
 
     // let unused = gl.createTexture();
     // gl.bindTexture(gl.TEXTURE_2D, unused);
@@ -642,8 +641,11 @@ function renderScene(gl){
     new Matrix4().translate(0.5, 0.5, 0.5).scale(0.5, 0.5, 0.5).multiply(light.camera.projectionMatrix).elements);
   gl.uniformMatrix4fv(gld.u_CamViewMatrix, false, new Matrix4(light.camera.viewMatrix).elements);
 
-  var dt = getShadowMap(gl);
-  gl.uniform1i(gld.u_depthTex, 3);
+  if (firstRun) {
+    getShadowMap(gl);
+    
+    firstRun = false;
+  }
 
 
   clearCanvas(gl);

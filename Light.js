@@ -2,7 +2,7 @@ class Light {
 
     /**
      * 
-     * @param {number} illumination 
+     * @param {Vector3} illumination 
      * @param {Camera} camera 
      */
     constructor(illumination, camera){

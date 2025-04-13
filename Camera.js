@@ -85,7 +85,7 @@ class Camera {
         this.getFrustumPlanes();
     }
 
-    #move(forward, left, up){        
+    move(forward, left, up){        
         let lookDir = new Vector3(this.at.elements);
         lookDir.sub(this.eye);
         lookDir.normalize();
@@ -143,10 +143,10 @@ class Camera {
         this.frustumPlanes = null;
     }
 
-    moveForwards = (speed) => this.#move(speed, 0, 0);
-    moveBackwards = (speed) => this.#move(-speed, 0, 0);
-    moveLeft = (speed) => this.#move(0, speed, 0);
-    moveRight = (speed) => this.#move(0, -speed, 0);
+    moveForwards = (speed) => this.move(speed, 0, 0);
+    moveBackwards = (speed) => this.move(-speed, 0, 0);
+    moveLeft = (speed) => this.move(0, speed, 0);
+    moveRight = (speed) => this.move(0, -speed, 0);
     panLeft = (angle) => this.#pan(angle, 0);
     panRight = (angle) => this.#pan(-angle, 0);
     panUp = (angle) => this.#pan(0, angle);

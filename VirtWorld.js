@@ -2,13 +2,13 @@
 
 // ColoredPoint.js (c) 2012 matsuda
 // Vertex shader program
-var VSHADER_SOURCE =`
-attribute vec4 a_Position;
-attribute vec2 a_UV;
-attribute vec3 a_Normal;
-varying vec2 v_UV;
-varying vec3 v_Normal;
-varying vec4 v_vertPos;
+var VSHADER_SOURCE =`#version 300 es
+in vec4 a_Position;
+in vec2 a_UV;
+in vec3 a_Normal;
+out vec2 v_UV;
+out vec3 v_Normal;
+out vec4 v_vertPos;
 uniform mat4 u_ModelMatrix;
 uniform mat4 u_NormalMatrix;
 uniform mat4 u_ViewMatrix;
@@ -18,15 +18,15 @@ uniform vec3 u_minAABB;
 uniform vec3 u_maxAABB;
 
 uniform vec3 u_lightPos;
-varying vec3 v_lightPos;
+out vec3 v_lightPos;
 uniform vec4 u_illumination;
-varying vec4 v_illumination;
+out vec4 v_illumination;
 
-varying vec4 v_diffuse;
-varying float v_tex;
+out vec4 v_diffuse;
+out float v_tex;
 
 uniform int u_doingInstances;
-attribute vec4 a_offset;
+in vec4 a_offset;
 void main() {
   v_vertPos = u_doingInstances == 1 ? (a_Position + vec4(a_offset.xyz, 0)) : u_ModelMatrix * a_Position;
   v_Normal = a_Normal;
@@ -41,7 +41,7 @@ void main() {
 }`;
 
 // Fragment shader program
-var FSHADER_SOURCE =`
+var FSHADER_SOURCE =`#version 300 es
 precision mediump float;
 uniform vec4 u_FragColor;
 uniform sampler2D u_Sampler0;
@@ -54,16 +54,16 @@ uniform sampler2D u_Sampler5;
 uniform sampler2D u_depthTex;
 uniform int u_colorSrc;
 
-varying vec3 v_lightPos;
-varying vec4 v_illumination;
+in vec3 v_lightPos;
+in vec4 v_illumination;
 uniform vec3 u_cameraPos;
 
-varying vec2 v_UV;
-varying vec3 v_Normal;
-varying vec4 v_vertPos;
+in vec2 v_UV;
+in vec3 v_Normal;
+in vec4 v_vertPos;
 
-varying vec4 v_diffuse;
-varying float v_tex;
+in vec4 v_diffuse;
+in float v_tex;
 
 uniform mat4 u_CamViewMatrix;
 uniform mat4 u_CamProjectionMatrix;
@@ -74,6 +74,8 @@ vec4 k_ambient = vec4(.5, .5, .5, 1);
 vec4 k_specular = vec4(1, 1, 1, 1);
 float n_specular = 2.;
 
+out vec4 fragColor;
+
 mat3 kernel = mat3(1., 2., 1.,
                    2., 3., 2.,
                    1., 2., 1.);
@@ -83,7 +85,7 @@ bool sampleShadow(vec3 p, vec2 offset){
   bool inRange = p.x > 1. || p.x < 0. 
               || p.y > 1. || p.y < 0.;
   
-  bool inShadow = texture2D(u_depthTex, p.xy + offset * texelSize).r < p.z - .00001;
+  bool inShadow = texture(u_depthTex, p.xy + offset * texelSize).r < p.z - .00001;
   
   return inRange || inShadow;
 }
@@ -107,20 +109,20 @@ void main() {
   int tex = int(v_tex + 0.5);
   if (u_colorSrc == 3){
       if (tex == 0){
-        baseColor = texture2D(u_Sampler0, v_UV);
+        baseColor = texture(u_Sampler0, v_UV);
       } else if (tex == 1){
-        baseColor = texture2D(u_Sampler1, v_UV);
+        baseColor = texture(u_depthTex, v_UV);
       } else if (tex == 2){
-        baseColor = texture2D(u_Sampler2, v_UV);
+        baseColor = texture(u_Sampler2, v_UV);
       } else if (tex == 3){
-        baseColor = texture2D(u_Sampler3, v_UV);
+        baseColor = texture(u_Sampler3, v_UV);
       } else if (tex == 4){
-        baseColor = texture2D(u_Sampler4, v_UV);
+        baseColor = texture(u_Sampler4, v_UV);
       } else if (tex == 5){
-        baseColor = texture2D(u_Sampler5, v_UV);
+        baseColor = texture(u_Sampler5, v_UV);
       }
   } else if (u_colorSrc == 4){
-    baseColor = texture2D(u_Sampler1, v_UV);
+    baseColor = texture(u_Sampler1, v_UV);
   }
 
   vec4 projPoint1 = u_CamProjectionMatrix * u_CamViewMatrix * v_vertPos;
@@ -130,11 +132,11 @@ void main() {
   vec3 lightVector = normalize(v_lightPos);
   vec3 cameraVector = normalize(u_cameraPos - vec3(v_vertPos));
   vec3 halfway = normalize(lightVector + cameraVector);
-  gl_FragColor = k_ambient;
-  gl_FragColor +=  (1. - shadowAmnt(projPoint.xyz)) * v_diffuse;
-  // gl_FragColor += v_diffuse;
-  // gl_FragColor += k_specular * v_illumination * pow(max(0., dot(normalize(v_Normal), halfway)), n_specular);
-  gl_FragColor *= baseColor;
+  fragColor = k_ambient;
+  fragColor +=  (1. - shadowAmnt(projPoint.xyz)) * v_diffuse;
+  // fragColor += v_diffuse;
+  // fragColor += k_specular * v_illumination * pow(max(0., dot(normalize(v_Normal), halfway)), n_specular);
+  fragColor *= baseColor;
 }`;
 
 
@@ -227,7 +229,7 @@ let ground = new TexCube(new Matrix4().translate(0, -5, 0).scale(10, 1, 10), nul
 
 let acc_frame_time = 0;
 
-const lightSize = 1 << 14;
+const lightSize = 512;
 let light = new Light(new Vector4([.5, .5, .5, 1]), new Camera(1, true, 200));
 light.camera.move(0, 50, 0);
 light.camera.panUp(45);
@@ -235,7 +237,7 @@ light.camera.panRight(45);
 light.camera.moveBackwards(200);
 
 
-const fullWorldSize = 1260;
+const fullWorldSize = 200;
 
 let depthTex, depthFrameBuffer;
 
@@ -256,14 +258,14 @@ let shadow_gld = {
 
 /**
  * Get the canvas and gl context
- * @returns {[WebGLRenderingContext, HTMLCanvasElement]} gl context
+ * @returns {[WebGL2RenderingContext, HTMLCanvasElement]} gl context
  */
 function setupWebGL(){
   var canvas = document.getElementById('webgl');
 
   // Get the rendering context for WebGL
   // var gl = getWebGLContext(canvas);
-  var gl = canvas.getContext("webgl", {preserveDrawingBuffer: false});
+  var gl = canvas.getContext("webgl2", {preserveDrawingBuffer: false});
   if (!gl) {
     throw new Error('Failed to get the rendering context for WebGL');
   }
@@ -273,7 +275,7 @@ function setupWebGL(){
 
 /**
  * Compile the shader programs, attach the javascript variables to the GLSL variables
- * @param {WebGLRenderingContext} gl Rendering context
+ * @param {WebGL2RenderingContext} gl Rendering context
  * @param {string[]} attrs Attributes to locate
  * @param {string[]} unifs Uniforms to locate
  * @returns {[GLint[], WebGLUniformLocation[]]} attribute variables and uniform vairabl
@@ -326,7 +328,7 @@ function connectDataToGLSL(gl, prog, gld){
 
 /**
  * 
- * @param {WebGLRenderingContext} gl 
+ * @param {WebGL2RenderingContext} gl 
  * @param {WebGLTexture} texture 
  * @param {WebGLUniformLocation} u_Sampler 
  * @param {HTMLImageElement} image 
@@ -353,7 +355,7 @@ function loadTexture(gl, texture, u_Sampler, image, num) {
 
 /**
  * Clears canvas
- * @param {WebGLRenderingContext} gl 
+ * @param {WebGL2RenderingContext} gl 
  */
 function clearCanvas(gl){
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -361,7 +363,7 @@ function clearCanvas(gl){
 
 /**
  * 
- * @param {WebGLRenderingContext} gl 
+ * @param {WebGL2RenderingContext} gl 
  * @param {WebGLUniformLocation} u_Sampler 
  */
 function initTextures(gl, src, u_Sampler, num){
@@ -392,15 +394,15 @@ function main() {
   gl.enable(gl.CULL_FACE);
   gl.clearColor(.5, .75, 1, 1.0);
 
-  ext = gl.getExtension('ANGLE_instanced_arrays');
-  if (!ext) {
-    throw new Error("Could not get extension ''ANGLE_instanced_arrays''");
-  }
+  // ext = gl.getExtension('ANGLE_instanced_arrays');
+  // if (!ext) {
+  //   throw new Error("Could not get extension ''ANGLE_instanced_arrays''");
+  // }
 
-  ext2 = gl.getExtension("WEBGL_depth_texture");
-  if (!ext2){
-    throw new Error("Could not get extension 'WEBGL_depth_texture'");
-  }
+  // ext2 = gl.getExtension("WEBGL_depth_texture");
+  // if (!ext2){
+  //   throw new Error("Could not get extension 'WEBGL_depth_texture'");
+  // }
 
   // ext2 = gl.getExtension('GMAN_webgl_memory');
   // if (!ext) {
@@ -558,13 +560,13 @@ function init_world(){
 
 /**
  * Gets camera depth map
- * @param {WebGLRenderingContext} gl 
+ * @param {WebGL2RenderingContext} gl 
  */
 function getShadowMap(gl){
 
   console.log("getting shadows");
 
-  gl.cullFace(gl.FRONT);
+  // gl.cullFace(gl.FRONT);
   gl.uniform1i(gld.u_colorSrc, 3);
   gl.uniform1i(gld.u_depthTex, 0);
   gl.bindFramebuffer(gl.FRAMEBUFFER, depthFrameBuffer);
@@ -588,7 +590,7 @@ function getShadowMap(gl){
 let firstRun = true;
 /**
  * Renders scene
- * @param {WebGLRenderingContext} gl 
+ * @param {WebGL2RenderingContext} gl 
  */
 function renderScene(gl){
 
@@ -616,12 +618,12 @@ function renderScene(gl){
     gl.texImage2D(
       gl.TEXTURE_2D,
       0,
-      gl.DEPTH_COMPONENT,
+      gl.DEPTH_COMPONENT32F,
       lightSize,
       lightSize,
       0,
       gl.DEPTH_COMPONENT,
-      gl.UNSIGNED_SHORT,
+      gl.FLOAT,
       null
     );
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);

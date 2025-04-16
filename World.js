@@ -270,7 +270,7 @@ class World {
     
     /**
      * Renders in
-     * @param {WebGLRenderingContext} gl WebGL rendering context
+     * @param {WebGL2RenderingContext} gl WebGL rendering context
      * @param {ANGLE_instanced_arrays} ext Instanced Arrays extension
      * @param {Object.<string, WebGLUniformLocation | GLint>} gld WebGL program data
      */
@@ -386,7 +386,7 @@ class World {
 
         gl.vertexAttribPointer(gld.a_offset, 4, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(gld.a_offset);
-        ext.vertexAttribDivisorANGLE(gld.a_offset, 1);
+        gl.vertexAttribDivisor(gld.a_offset, 1);
 
         // if (!depthOnly){
         //     gl.bindBuffer(gl.ARRAY_BUFFER, this.uvOffsetBuffer);
@@ -401,7 +401,7 @@ class World {
         // }
 
         // gl.drawArraysInstanced(drawType, 0, n);
-        ext.drawArraysInstancedANGLE(gl.TRIANGLES, 0, this.inst.vertices.length / 3, this.block_count);
+        gl.drawArraysInstanced(gl.TRIANGLES, 0, this.inst.vertices.length / 3, this.block_count);
 
         gl.uniform1i(gld.u_doingInstances, 0);
         this.offset_buffer_stale = false;

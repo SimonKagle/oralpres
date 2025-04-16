@@ -2,7 +2,7 @@
 
 /**
  * Creates and draws buffer of points
- * @param {WebGLRenderingContext} gl WebGL rendering context
+ * @param {WebGL2RenderingContext} gl WebGL rendering context
  * @param {Number} drawType Primitive type to pass to drawArrays
  * @param {Number} n Number of vertices per primative
  * @param {Matrix4} matrix Model matrix
@@ -36,7 +36,7 @@ function drawPrimitive(gl, drawType, n, matrix, color,
 
 /**
  * Creates and draws buffer of points
- * @param {WebGLRenderingContext} gl WebGL rendering context
+ * @param {WebGL2RenderingContext} gl WebGL rendering context
  * @param {Number} drawType Primitive type to pass to drawArrays
  * @param {Number} n Number of vertices per primative
  * @param {Float32Array} vertices Vertices of object
@@ -183,7 +183,7 @@ class Cube {
 
     /**
      * Renders cube
-     * @param {WebGLRenderingContext} gl Rendering Context
+     * @param {WebGL2RenderingContext} gl Rendering Context
      * @param {GLint} a_Position Position Attribute
      * @param {WebGLUniformLocation} u_FragColor Color uniform
      * @param {WebGLUniformLocation} u_Matrix Matrix uniform

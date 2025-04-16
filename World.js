@@ -81,7 +81,7 @@ class World {
 
     addCache(revealed){
         if (this.offset_cache.length - this.block_count * 4 < revealed.length){
-            let newCache = new Float32Array(this.block_count * 4 + revealed.length);
+            let newCache = new Int16Array(this.block_count * 4 + revealed.length);
             for (let i = 0; i < newCache.length; i++){
                 if (i < this.block_count * 4){
                     newCache[i] = this.offset_cache[i];
@@ -267,6 +267,51 @@ class World {
         this.offset_cache = new Float32Array(this.offset_cache, 0, this.block_count * 3);
         */
     }
+
+    fillOffsetCache(){
+        if (this.offset_cache == null){
+            this.offset_cache = [];
+            this.uvOffset_cache = [];
+            this.block_count = 0;
+            for (var z = 0; z < this.cubes.length; z++){
+                for (var x = 0; x < this.cubes[z].length; x++){
+                    for (var y = 0; y < this.cubes[z][x].length; y++){
+                        if (this.cubes[z][x][y]){
+
+                            let fullyHidden = true;
+                            for (let side_check = 0; side_check < 6; side_check++){
+                                let sign = side_check % 2 * 2 - 1;
+                                let side = Math.floor(side_check / 2);
+                                let testx = x + (side == 0 ? sign : 0);
+                                let testy = y + (side == 1 ? sign : 0);
+                                let testz = z + (side == 2 ? sign : 0);
+                                if (testy < 0) continue;
+                                if (testx < 0 || testx >= this.cubes[z].length
+                                    || testz < 0 || testz >= this.cubes.length
+                                    || testy >= this.cubes[z][x].length
+                                    || !this.cubes[testz][testx][testy]) {
+                                    fullyHidden = false;
+                                    break;
+                                }
+                            }
+
+                            if (fullyHidden) continue;
+
+                            this.offset_cache.push(...this.grid2point(x, y, z), this.cubes[z][x][y] - 1);
+                            this.block_count++;
+                        }
+                    }
+                }
+            }
+
+
+            console.log("Cache done");
+
+            this.offset_cache = new Int16Array(this.offset_cache);
+            this.uvOffset_cache = new Float32Array(this.uvOffset_cache);
+
+        }
+    }
     
     /**
      * Renders in
@@ -336,55 +381,14 @@ class World {
             throw new Error('Could not create offset buffer!');
         }
 
-        if (this.offset_cache == null){
-            this.offset_cache = [];
-            this.uvOffset_cache = [];
-            this.block_count = 0;
-            for (var z = 0; z < this.cubes.length; z++){
-                for (var x = 0; x < this.cubes[z].length; x++){
-                    for (var y = 0; y < this.cubes[z][x].length; y++){
-                        if (this.cubes[z][x][y]){
-
-                            let fullyHidden = true;
-                            for (let side_check = 0; side_check < 6; side_check++){
-                                let sign = side_check % 2 * 2 - 1;
-                                let side = Math.floor(side_check / 2);
-                                let testx = x + (side == 0 ? sign : 0);
-                                let testy = y + (side == 1 ? sign : 0);
-                                let testz = z + (side == 2 ? sign : 0);
-                                if (testy < 0) continue;
-                                if (testx < 0 || testx >= this.cubes[z].length
-                                    || testz < 0 || testz >= this.cubes.length
-                                    || testy >= this.cubes[z][x].length
-                                    || !this.cubes[testz][testx][testy]) {
-                                    fullyHidden = false;
-                                    break;
-                                }
-                            }
-
-                            if (fullyHidden) continue;
-
-                            this.offset_cache.push(...this.grid2point(x, y, z), this.cubes[z][x][y] - 1);
-                            this.block_count++;
-                        }
-                    }
-                }
-            }
-
-
-            console.log("Cache done");
-
-            this.offset_cache = new Float32Array(this.offset_cache);
-            this.uvOffset_cache = new Float32Array(this.uvOffset_cache);
-
-        }
+        this.fillOffsetCache(gl, gld);
 
         gl.bindBuffer(gl.ARRAY_BUFFER, this.offsetBuffer);
         if (this.offset_buffer_stale){
             gl.bufferData(gl.ARRAY_BUFFER, this.offset_cache.subarray(0, this.block_count * 4), gl.STREAM_DRAW);
         }
 
-        gl.vertexAttribPointer(gld.a_offset, 4, gl.FLOAT, false, 0, 0);
+        gl.vertexAttribIPointer(gld.a_offset, 4, gl.SHORT, false, 0, 0);
         gl.enableVertexAttribArray(gld.a_offset);
         gl.vertexAttribDivisor(gld.a_offset, 1);
 

@@ -6,6 +6,8 @@ var VSHADER_SOURCE =`#version 300 es
 in vec4 a_Position;
 in vec2 a_UV;
 in vec3 a_Normal;
+in ivec4 a_offset;
+
 out vec2 v_UV;
 out vec3 v_Normal;
 out vec4 v_vertPos;
@@ -23,11 +25,10 @@ uniform vec4 u_illumination;
 out vec4 v_illumination;
 
 out vec4 v_diffuse;
-out float v_tex;
+flat out int v_tex;
 out vec4 v_projVertPos;
 
 uniform int u_doingInstances;
-in vec4 a_offset;
 void main() {
   v_vertPos = u_doingInstances == 1 ? (a_Position + vec4(a_offset.xyz, 0)) : u_ModelMatrix * a_Position;
   v_Normal = a_Normal;
@@ -68,7 +69,7 @@ in vec4 v_vertPos;
 in vec4 v_projVertPos;
 
 in vec4 v_diffuse;
-in float v_tex;
+flat in int v_tex;
 
 uniform mat4 u_CamViewMatrix;
 uniform mat4 u_CamProjectionMatrix;
@@ -82,13 +83,13 @@ float n_specular = 2.;
 out vec4 fragColor;
 
 bool sampleShadow(vec3 p, vec2 offset){
-  vec2 texelSize = 1.0 / vec2(textureSize(u_depthTex, 0));
-  bool inRange = p.x > 1. || p.x < 0. 
+  vec2 texelSize = 2.0 / vec2(textureSize(u_depthTex, 0));
+  bool notInRange = p.x > 1. || p.x < 0. 
               || p.y > 1. || p.y < 0.;
   
   bool inShadow = texture(u_depthTex, p.xy + offset * texelSize).r < p.z - 0.00001;
   
-  return inRange || inShadow;
+  return !notInRange && inShadow;
 }
 
 float shadowAmnt(vec3 p){
@@ -101,25 +102,22 @@ float shadowAmnt(vec3 p){
     }
   }
   return res / total;
-
-
 }
 
 void main() {
   vec4 baseColor = vec4(1);
-  int tex = int(v_tex + 0.5);
   if (u_colorSrc == 3){
-      if (tex == 0){
+      if (v_tex == 0){
         baseColor = texture(u_Sampler0, v_UV);
-      } else if (tex == 1){
+      } else if (v_tex == 1){
         baseColor = texture(u_Sampler1, v_UV);
-      } else if (tex == 2){
+      } else if (v_tex == 2){
         baseColor = texture(u_Sampler2, v_UV);
-      } else if (tex == 3){
+      } else if (v_tex == 3){
         baseColor = texture(u_Sampler3, v_UV);
-      } else if (tex == 4){
+      } else if (v_tex == 4){
         baseColor = texture(u_Sampler4, v_UV);
-      } else if (tex == 5){
+      } else if (v_tex == 5){
         baseColor = texture(u_Sampler5, v_UV);
       }
   } else if (u_colorSrc == 4){
@@ -176,7 +174,7 @@ let camera;
 
 let mainShader, shadowShader;
 
-const moveSpeed = .2;
+const moveSpeed = .5;
 const panSpeed = 5;
 
 var world = [
@@ -230,12 +228,12 @@ let ground = new TexCube(new Matrix4().translate(0, -5, 0).scale(10, 1, 10), nul
 
 let acc_frame_time = 0;
 
-const lightSize = 1 << 14;
-let light = new Light(new Vector4([.5, .5, .5, 1]), new Camera(1, true, 200));
+const lightSize = 1 << 12;
+let light = new Light(new Vector4([1, .7, .2, 1]), new Camera(1, true, 100));
 light.camera.move(0, 50, 0);
 light.camera.panUp(45);
 light.camera.panRight(45);
-light.camera.moveBackwards(200);
+light.camera.moveBackwards(250);
 
 
 const fullWorldSize = 200;
@@ -394,7 +392,8 @@ function main() {
   gl.enable(gl.DEPTH_TEST);
   gl.enable(gl.CULL_FACE);
   gl.TEXTURE_COMPARE_MODE
-  gl.clearColor(.5, .75, 1, 1.0);
+  gl.clearColor(.9/2, .75/2, .8/2, 1.0);
+  // gl.clearColor(200/255, 87/255, 51/255, 1)
 
   // ext = gl.getExtension('ANGLE_instanced_arrays');
   // if (!ext) {
@@ -509,6 +508,8 @@ function main() {
 
   gl.uniform1i(gld.u_depthTexSize, lightSize)
   wObj.cull(camera);
+  wObj.fillOffsetCache();
+  getShadowMap(gl);
   tick(gl);
 
 }

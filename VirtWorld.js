@@ -24,6 +24,7 @@ out vec4 v_illumination;
 
 out vec4 v_diffuse;
 out float v_tex;
+out vec4 v_projVertPos;
 
 uniform int u_doingInstances;
 in vec4 a_offset;
@@ -32,6 +33,7 @@ void main() {
   v_Normal = a_Normal;
   v_UV = vec2(a_UV.x, a_UV.y);
   gl_Position = u_ProjectionMatrix * u_ViewMatrix * v_vertPos;
+  v_projVertPos = gl_Position;
   v_tex = a_offset.w;
 
   vec3 lightVector = normalize(u_lightPos);
@@ -42,7 +44,7 @@ void main() {
 
 // Fragment shader program
 var FSHADER_SOURCE =`#version 300 es
-precision mediump float;
+precision highp float;
 uniform vec4 u_FragColor;
 uniform sampler2D u_Sampler0;
 uniform sampler2D u_Sampler1;
@@ -51,8 +53,10 @@ uniform sampler2D u_Sampler3;
 uniform sampler2D u_Sampler4;
 uniform sampler2D u_Sampler5;
 
-uniform sampler2D u_depthTex;
+uniform highp sampler2D u_depthTex;
 uniform int u_colorSrc;
+
+uniform bool u_isDepth;
 
 in vec3 v_lightPos;
 in vec4 v_illumination;
@@ -61,6 +65,7 @@ uniform vec3 u_cameraPos;
 in vec2 v_UV;
 in vec3 v_Normal;
 in vec4 v_vertPos;
+in vec4 v_projVertPos;
 
 in vec4 v_diffuse;
 in float v_tex;
@@ -76,16 +81,12 @@ float n_specular = 2.;
 
 out vec4 fragColor;
 
-mat3 kernel = mat3(1., 2., 1.,
-                   2., 3., 2.,
-                   1., 2., 1.);
-
 bool sampleShadow(vec3 p, vec2 offset){
-  vec2 texelSize = 1.0 / vec2(u_depthTexSize);
+  vec2 texelSize = 1.0 / vec2(textureSize(u_depthTex, 0));
   bool inRange = p.x > 1. || p.x < 0. 
               || p.y > 1. || p.y < 0.;
   
-  bool inShadow = texture(u_depthTex, p.xy + offset * texelSize).r < p.z - .00001;
+  bool inShadow = texture(u_depthTex, p.xy + offset * texelSize).r < p.z - 0.00001;
   
   return inRange || inShadow;
 }
@@ -111,7 +112,7 @@ void main() {
       if (tex == 0){
         baseColor = texture(u_Sampler0, v_UV);
       } else if (tex == 1){
-        baseColor = texture(u_depthTex, v_UV);
+        baseColor = texture(u_Sampler1, v_UV);
       } else if (tex == 2){
         baseColor = texture(u_Sampler2, v_UV);
       } else if (tex == 3){
@@ -229,7 +230,7 @@ let ground = new TexCube(new Matrix4().translate(0, -5, 0).scale(10, 1, 10), nul
 
 let acc_frame_time = 0;
 
-const lightSize = 512;
+const lightSize = 1 << 14;
 let light = new Light(new Vector4([.5, .5, .5, 1]), new Camera(1, true, 200));
 light.camera.move(0, 50, 0);
 light.camera.panUp(45);
@@ -392,6 +393,7 @@ function main() {
 
   gl.enable(gl.DEPTH_TEST);
   gl.enable(gl.CULL_FACE);
+  gl.TEXTURE_COMPARE_MODE
   gl.clearColor(.5, .75, 1, 1.0);
 
   // ext = gl.getExtension('ANGLE_instanced_arrays');
@@ -564,9 +566,9 @@ function init_world(){
  */
 function getShadowMap(gl){
 
-  console.log("getting shadows");
+  // console.log("getting shadows");
 
-  // gl.cullFace(gl.FRONT);
+  gl.cullFace(gl.FRONT);
   gl.uniform1i(gld.u_colorSrc, 3);
   gl.uniform1i(gld.u_depthTex, 0);
   gl.bindFramebuffer(gl.FRAMEBUFFER, depthFrameBuffer);
@@ -626,10 +628,11 @@ function renderScene(gl){
       gl.FLOAT,
       null
     );
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_MODE, gl.COMPARE_REF_TO_TEXTURE);
 
     depthFrameBuffer = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, depthFrameBuffer);
@@ -642,23 +645,22 @@ function renderScene(gl){
   gl.uniformMatrix4fv(gld.u_CamProjectionMatrix, false, 
     new Matrix4().translate(0.5, 0.5, 0.5).scale(0.5, 0.5, 0.5).multiply(light.camera.projectionMatrix).elements);
   gl.uniformMatrix4fv(gld.u_CamViewMatrix, false, new Matrix4(light.camera.viewMatrix).elements);
-
+  
   if (firstRun) {
     getShadowMap(gl);
-    
     firstRun = false;
   }
+  gl.uniform1i(gld.u_depthTex, 31);
 
 
   clearCanvas(gl);
   gl.uniform1i(gld.u_colorSrc, 4);
   ground.render(gl, gld.a_Position, gld.a_Normal, gld.a_UV, gld.u_ModelMatrix, gld.u_NormalMatrix);
-  cmPos.render(gl, gld.a_Position, gld.a_Normal, gld.a_UV, gld.u_ModelMatrix, gld.u_NormalMatrix);
   gl.uniform1i(gld.u_colorSrc, 3);
 
-  let [minPt, maxPt] = camera.getAABB();
-  gl.uniform3fv(gld.u_maxAABB, maxPt.elements);
-  gl.uniform3fv(gld.u_minAABB, minPt.elements);
+  // let [minPt, maxPt] = camera.getAABB();
+  // gl.uniform3fv(gld.u_maxAABB, maxPt.elements);
+  // gl.uniform3fv(gld.u_minAABB, minPt.elements);
   wObj.renderFast(gl, ext, gld);
 
   let curr_frame_time = performance.now() - start

@@ -183,7 +183,7 @@ class World {
                             if (dx != 0 && dy != 0 && dz != 0 ||
                                 dx == 0 && dy == 0 && dz == 0) continue;
                             if (this.cubes[gz + dz][gx + dx][gy + dy]){
-                                revealed.push(...this.grid2point(gx + dx, gy + dy, gz + dz), this.cubes[gz + dz][gx + dx][gy + dy] - .5);
+                                revealed.push(...this.grid2point(gx + dx, gy + dy, gz + dz), this.cubes[gz + dz][gx + dx][gy + dy] - 1);
                             }
                         }
                     }
@@ -364,7 +364,7 @@ class World {
 
                             if (fullyHidden) continue;
 
-                            this.offset_cache.push(...this.grid2point(x, y, z), (this.cubes[z][x][y] - 1) + 0.5);
+                            this.offset_cache.push(...this.grid2point(x, y, z), this.cubes[z][x][y] - 1);
                             this.block_count++;
                         }
                     }

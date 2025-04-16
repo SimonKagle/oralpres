@@ -104,7 +104,7 @@ float shadowAmnt(vec3 p){
 
 void main() {
   vec4 baseColor = vec4(1);
-  int tex = int(floor(v_tex));
+  int tex = int(v_tex + 0.5);
   if (u_colorSrc == 3){
       if (tex == 0){
         baseColor = texture2D(u_Sampler0, v_UV);
@@ -235,7 +235,7 @@ light.camera.panRight(45);
 light.camera.moveBackwards(200);
 
 
-const fullWorldSize = 200;
+const fullWorldSize = 1260;
 
 let depthTex, depthFrameBuffer;
 

@@ -273,7 +273,7 @@ light.camera.panRight(45);
 light.camera.moveBackwards(250);
 
 
-const fullWorldSize = 1050;
+const fullWorldSize = 200;
 
 let depthTex, depthFrameBuffer;
 

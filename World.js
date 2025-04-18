@@ -442,4 +442,15 @@ class World {
         // console.log(gl.getBufferParameter(this.uvBuffer, gl.BUFFER_SIZE));
         // console.log(gl.getBufferParameter(this.offsetBuffer, gl.BUFFER_SIZE));
     }
+
+    /**
+     * Destroy this World, free all memory
+     * @param {WebGL2RenderingContext} gl 
+     */
+    destroy(gl){
+        gl.deleteBuffer(this.uvBuffer);
+        gl.deleteBuffer(this.normalBuffer);
+        gl.deleteBuffer(this.vertBuffer);
+        gl.deleteBuffer(this.offsetBuffer);
+    }
 }

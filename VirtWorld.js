@@ -273,7 +273,7 @@ light.camera.panRight(45);
 light.camera.moveBackwards(250);
 
 
-const fullWorldSize = 200;
+var fullWorldSize = 200;
 
 let depthTex, depthFrameBuffer;
 
@@ -532,6 +532,16 @@ function main() {
     await canvas.requestPointerLock();
   }
 
+  let remakeSize = document.getElementById("remakeSize");
+  remakeSize.value = fullWorldSize;
+  document.getElementById("remake").onclick = (ev) => {
+    wObj.destroy(gl);
+    fullWorldSize = remakeSize.valueAsNumber;
+    init_world();
+    wObj.renderFast(gl, null, gld);
+    getShadowMap(gl);
+  };
+
   let camPan = (xDiff, yDiff) => {
     camera.panRight(xDiff * mouseSensitivity);
     yPan += yDiff * mouseSensitivity;
@@ -674,13 +684,9 @@ function init_world(){
     }
   }
 
-  world = newWorld
+  // world = newWorld
   // [[1, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
   wObj = new World(newWorld, cubeSize, padding);
-
-  ground = new TexCube(new Matrix4(), null, [world[0].length * cubeSize, 0.1, world.length * cubeSize]);
-  ground.uvs = ground.uvs.map((i) => i * world[0].length * cubeSize);
-  ground.matrix.translate(-cubeSize, -cubeSize, -cubeSize);
 
   
 }

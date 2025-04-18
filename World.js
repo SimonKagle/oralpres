@@ -24,6 +24,7 @@ class World {
                     // this.cubes[z].push(Array(blockHeights[z][x]).fill(1))
                     if (this.cubes[z][x].length > 0) this.cubes[z][x][this.cubes[z][x].length - 1] = 2;
                 }
+                this.cubes[z][x].unshift(2);
                 // if(this.cubes[z].length > 0) this.cubes[z][this.cubes[z].length - 1] = 2;
                 this.block_count += blockHeights[z][x];
             }

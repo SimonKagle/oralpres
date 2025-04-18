@@ -54,7 +54,7 @@ uniform sampler2D u_Sampler3;
 uniform sampler2D u_Sampler4;
 uniform sampler2D u_Sampler5;
 
-uniform highp sampler2D u_depthTex;
+uniform highp sampler2DShadow u_depthTex;
 uniform int u_colorSrc;
 
 uniform bool u_isDepth;
@@ -75,6 +75,7 @@ uniform mat4 u_CamViewMatrix;
 uniform mat4 u_CamProjectionMatrix;
 
 uniform int u_depthTexSize;
+uniform bool u_doingShadowMap;
 
 vec4 k_ambient = vec4(.5, .5, .5, 1);
 vec4 k_specular = vec4(1, 1, 1, 1);
@@ -82,14 +83,14 @@ float n_specular = 2.;
 
 out vec4 fragColor;
 
-bool sampleShadow(vec3 p, vec2 offset){
+float sampleShadow(vec3 p, vec2 offset){
   vec2 texelSize = 2.0 / vec2(textureSize(u_depthTex, 0));
   bool notInRange = p.x > 1. || p.x < 0. 
               || p.y > 1. || p.y < 0.;
   
-  bool inShadow = texture(u_depthTex, p.xy + offset * texelSize).r < p.z - 0.00001;
+  float inShadow = texture(u_depthTex, vec3(p.xy + offset * texelSize, p.z - 0.00001));
   
-  return !notInRange && inShadow;
+  return notInRange ? 0.0 : 1. - inShadow;
 }
 
 float shadowAmnt(vec3 p){
@@ -132,11 +133,45 @@ void main() {
   vec3 cameraVector = normalize(u_cameraPos - vec3(v_vertPos));
   vec3 halfway = normalize(lightVector + cameraVector);
   fragColor = k_ambient;
-  fragColor +=  (1. - shadowAmnt(projPoint.xyz)) * v_diffuse;
+  if (!u_doingShadowMap){
+    fragColor += (1. - shadowAmnt(projPoint.xyz)) * v_diffuse;
+  }
   // fragColor += v_diffuse;
   // fragColor += k_specular * v_illumination * pow(max(0., dot(normalize(v_Normal), halfway)), n_specular);
   fragColor *= baseColor;
 }`;
+
+var shadowShaders = [
+  `#version 300 es
+  precision highp float;
+  in vec4 a_Position;
+  in vec2 a_UV;
+  in vec3 a_Normal;
+  in ivec4 a_offset;
+
+  uniform mat4 u_ModelMatrix;
+  uniform mat4 u_NormalMatrix;
+  uniform mat4 u_ViewMatrix;
+  uniform mat4 u_ProjectionMatrix;
+
+  uniform vec3 u_minAABB;
+  uniform vec3 u_maxAABB;
+
+  uniform vec3 u_lightPos;
+  uniform vec4 u_illumination;
+
+  uniform int u_doingInstances;
+  void main() {
+    gl_Position = u_doingInstances == 1 ? (a_Position + vec4(a_offset.xyz, 0)) : u_ModelMatrix * a_Position;
+    gl_Position = u_ProjectionMatrix * u_ViewMatrix * gl_Position;
+  }
+  `,
+  `#version 300 es
+  precision highp float;
+  out vec4 fragColor;
+  void main(){fragColor = vec4(1);}
+  `
+]
 
 
 let gld = {
@@ -167,6 +202,7 @@ let gld = {
   u_CamProjectionMatrix: null,
   u_CamViewMatrix: null,
   u_depthTexSize: null,
+  u_doingShadowMap: null,
 };
 
 /** @type {Camera} */
@@ -230,14 +266,14 @@ let acc_frame_time = 0;
 
 const lightSize = 1 << 12;
 //[1, .7, .2, 1]
-let light = new Light(new Vector4([.6, .6, .6, 1]), new Camera(1, true, 100));
+let light = new Light(new Vector4([.6, .6, .6, 1]), new Camera(1, true, 200));
 light.camera.move(0, 50, 0);
 light.camera.panUp(45);
 light.camera.panRight(45);
 light.camera.moveBackwards(250);
 
 
-const fullWorldSize = 200;
+const fullWorldSize = 1050;
 
 let depthTex, depthFrameBuffer;
 
@@ -429,11 +465,18 @@ function main() {
     throw new Error("Could not create main shader!");
   }
 
+  shadowShader = createProgram(gl, ...shadowShaders);
+  if(!shadowShader){
+    throw new Error("Could not create shadow shader!");
+  }
+
   connectDataToGLSL(gl, mainShader, gld);
+  connectDataToGLSL(gl, shadowShader, shadow_gld);
   gl.program = mainShader;
   gl.useProgram(mainShader);
 
   camera = new Camera(canvas.width/canvas.height);
+  camera.move(0, 0, 2 * cubeSize);
   gl.uniformMatrix4fv(gld.u_ProjectionMatrix, false, camera.projectionMatrix.elements);
 
   initTextures(gl, "stonev2.png", gld.u_Sampler0, 0);
@@ -586,7 +629,8 @@ function main() {
   // ----------------------------
 
 
-  gl.uniform1i(gld.u_depthTexSize, lightSize)
+  gl.uniform1i(gld.u_depthTexSize, lightSize);
+  gl.uniform1i(gld.u_depthTex, 31);
   wObj.cull(camera);
   wObj.fillOffsetCache();
   getShadowMap(gl);
@@ -647,26 +691,32 @@ function init_world(){
  */
 function getShadowMap(gl){
 
-  // console.log("getting shadows");
+  console.log("getting shadows");
 
+  gl.program = shadowShader;
+  gl.useProgram(shadowShader);
   gl.cullFace(gl.FRONT);
-  gl.uniform1i(gld.u_colorSrc, 3);
-  gl.uniform1i(gld.u_depthTex, 0);
+  // gl.uniform1i(shadow_gld.u_colorSrc, 3);
+  // gl.uniform1i(shadow_gld.u_doingShadowMap, 1);
   gl.bindFramebuffer(gl.FRAMEBUFFER, depthFrameBuffer);
-  gl.uniformMatrix4fv(gld.u_ProjectionMatrix, false, light.camera.projectionMatrix.elements);
-  gl.uniformMatrix4fv(gld.u_ViewMatrix, false, light.camera.viewMatrix.elements);
+  gl.uniformMatrix4fv(shadow_gld.u_ProjectionMatrix, false, light.camera.projectionMatrix.elements);
+  gl.uniformMatrix4fv(shadow_gld.u_ViewMatrix, false, light.camera.viewMatrix.elements);
   gl.viewport(0, 0, lightSize, lightSize);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-  wObj.renderFast(gl, ext, gld);
-  ground.render(gl, gld.a_Position, gld.a_Normal, gld.a_UV, gld.u_ModelMatrix, gld.u_NormalMatrix);
+  wObj.renderFast(gl, ext, shadow_gld, true);
+  // ground.render(gl, shadow_gld.a_Position, shadow_gld.a_Normal, 
+  //   shadow_gld.a_UV, shadow_gld.u_ModelMatrix, shadow_gld.u_NormalMatrix);
+  
+  gl.program = mainShader;
+  gl.useProgram(mainShader);
   gl.cullFace(gl.BACK);
-
+  gl.uniform1i(gld.u_doingShadowMap, 0);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   gl.uniformMatrix4fv(gld.u_ProjectionMatrix, false, camera.projectionMatrix.elements);
   gl.uniformMatrix4fv(gld.u_ViewMatrix, false, camera.viewMatrix.elements);
-  gl.uniform1i(gld.u_depthTex, 31);
+  // gl.uniform1i(gld.u_depthTex, 31);
 
 }
 
@@ -709,11 +759,11 @@ function renderScene(gl){
       gl.FLOAT,
       null
     );
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_MODE, gl.COMPARE_REF_TO_TEXTURE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_MODE, gl.COMPARE_REF_TO_TEXTURE);
 
     depthFrameBuffer = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, depthFrameBuffer);
@@ -731,12 +781,11 @@ function renderScene(gl){
     getShadowMap(gl);
     firstRun = false;
   }
-  gl.uniform1i(gld.u_depthTex, 31);
 
 
   clearCanvas(gl);
-  gl.uniform1i(gld.u_colorSrc, 4);
-  ground.render(gl, gld.a_Position, gld.a_Normal, gld.a_UV, gld.u_ModelMatrix, gld.u_NormalMatrix);
+  // gl.uniform1i(gld.u_colorSrc, 4);
+  // ground.render(gl, gld.a_Position, gld.a_Normal, gld.a_UV, gld.u_ModelMatrix, gld.u_NormalMatrix);
   gl.uniform1i(gld.u_colorSrc, 3);
 
   // let [minPt, maxPt] = camera.getAABB();

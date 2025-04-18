@@ -5,6 +5,10 @@
     justify-items: stretch;
 }
 
+#buttons>button{
+    font-size: 4em;
+}
+
 /* #Up {
     grid-area: 1/2/1/2;
 } */

@@ -264,11 +264,12 @@ class TexCube extends Cube {
         this.uvBuffer = null;
         this.normalBuffer = null;
         this.vertBuffer = null;
+        console.log(this.vertices);
     }
 
     render(gl, a_Position, a_Normal, a_UV, u_Matrix, u_NormalMatrix){
 
-        gl.uniformMatrix4fv(u_NormalMatrix, false, new Matrix4(this.matrix).invert().transpose().elements);
+        // gl.uniformMatrix4fv(u_NormalMatrix, false, new Matrix4(this.matrix).invert().transpose().elements);
 
         if (this.vertBuffer == null){
             console.log(this.vertices);

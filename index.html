@@ -2,23 +2,39 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>O-cat-lt Happenings</title>
+    <title>Oral Presentation Demo</title>
+    <link rel="stylesheet" href="styles.css"></style>
     <!-- <script src="https://greggman.github.io/webgl-memory/webgl-memory.js" crossorigin></script> -->
   </head>
 
   <body onload="main()">
-    
     <canvas id="webgl" width="800" height="800">
     Please use a browser that supports "canvas"
     </canvas>
-    <br>
-    avg. frame time: <span id="frameTime">(calculating...) </span>ms
-    <br>
-    avg. fps: <span id="fps">(calculating...)</span> fps
-    <br>
-    post-culled block count: <span id="blockCount"></span> blocks
-    <br>
-    total block count: <span id="totalCount"></span> blocks
+    <br><br>
+    By Simon Kagle - skagle@ucsc.edu<br>
+    Use WASD and Mouse to move if not on a phone,
+    otherwise use the buttons below and swipe. <br><br>
+    <span>
+      <br>
+      avg. frame time: <span id="frameTime">(calculating...) </span>ms
+      <br>
+      avg. fps: <span id="fps">(calculating...)</span> fps
+      <br>
+      post-culled block count: <span id="blockCount"></span> blocks
+      <br>
+      total block count: <span id="totalCount"></span> blocks
+    </span>
+    <br><br>
+
+    <div id="buttons">
+      <button id="Up" style="grid-area: 1/2/1/2;">^</button>
+      <button id="Down" style="grid-area: 2/2/2/2;">v</button>
+      <button id="Left" style="grid-area: 2/1/2/1;">&lt;</button>
+      <button id="Right" style="grid-area: 2/3/2/3;">></button>
+      <button id="Mine" style="grid-area: 2/4/2/4;">Mine</button>
+      <button id="Place" style="grid-area: 2/5/2/5;">Place</button>
+    </div>
 
     <script src="lib/cuon-matrix-cse160.js"></script>
     <script src="lib/webgl-utils.js"></script>

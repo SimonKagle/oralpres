@@ -1,0 +1,10 @@
+#buttons {
+    display: grid;
+    grid-template-columns: repeat(5, 20%);
+    grid-template-rows: repeat(2, 200px);
+    justify-items: stretch;
+}
+
+/* #Up {
+    grid-area: 1/2/1/2;
+} */

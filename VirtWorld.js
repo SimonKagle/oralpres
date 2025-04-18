@@ -229,7 +229,8 @@ let ground = new TexCube(new Matrix4().translate(0, -5, 0).scale(10, 1, 10), nul
 let acc_frame_time = 0;
 
 const lightSize = 1 << 12;
-let light = new Light(new Vector4([1, .7, .2, 1]), new Camera(1, true, 100));
+//[1, .7, .2, 1]
+let light = new Light(new Vector4([.6, .6, .6, 1]), new Camera(1, true, 100));
 light.camera.move(0, 50, 0);
 light.camera.panUp(45);
 light.camera.panRight(45);
@@ -391,7 +392,6 @@ function main() {
 
   gl.enable(gl.DEPTH_TEST);
   gl.enable(gl.CULL_FACE);
-  gl.TEXTURE_COMPARE_MODE
   gl.clearColor(.9/2, .75/2, .8/2, 1.0);
   // gl.clearColor(200/255, 87/255, 51/255, 1)
 
@@ -476,10 +476,10 @@ function main() {
 
   canvas.onmousedown = function(ev){
     if (ev.button == 0){
-      wObj.changePoint(...camera.at.elements, false);
+      wObj.changePoint(...camera.at.elements, 0);
       getShadowMap(gl);
     } else if (ev.button == 2){
-      wObj.changePoint(...camera.at.elements, true);
+      wObj.changePoint(...camera.at.elements, 1);
       getShadowMap(gl);
     }
     wObj.cull(camera);
@@ -489,22 +489,102 @@ function main() {
     await canvas.requestPointerLock();
   }
 
+  let camPan = (xDiff, yDiff) => {
+    camera.panRight(xDiff * mouseSensitivity);
+    yPan += yDiff * mouseSensitivity;
+    if (Math.abs(yPan) > MAX_Y_PAN){
+      yPan = Math.sign(yPan) * MAX_Y_PAN;
+    } else {
+      camera.panUp(yDiff * mouseSensitivity);
+    }
+    wObj.cull(camera);
+  }
+
   let yPan = 0;
   const MAX_Y_PAN = 85;
   canvas.onmousemove = (ev) => {
 
     // Don't pan if mouse is not locked
     if (document.pointerLockElement != canvas) return;
-
-    camera.panRight(ev.movementX * mouseSensitivity);
-    yPan += ev.movementY * mouseSensitivity;
-    if (Math.abs(yPan) > MAX_Y_PAN){
-      yPan = Math.sign(yPan) * MAX_Y_PAN;
-    } else {
-      camera.panUp(ev.movementY * mouseSensitivity);
-    }
-    wObj.cull(camera);
+    camPan(ev.movementX, ev.movementY);
   }
+
+  // ---------- Phones ----------
+  let xStart, yStart;
+  canvas.addEventListener("touchstart", (ev) => {
+    xStart = ev.touches[0].clientX;
+    yStart = ev.touches[0].clientY;
+  }, {passive: true});
+
+  canvas.addEventListener("touchmove", (ev) => {
+    if (!xStart || !yStart){
+      return;
+    }
+
+    let newX = ev.touches[0].clientX;
+    let newY = ev.touches[0].clientY;
+
+    let xDiff = newX - xStart;
+    let yDiff = newY - yStart;
+
+    camPan(xDiff, yDiff);
+
+    xStart = newX;
+    yStart = newY;
+  }, {passive: true});
+
+
+  /**
+   * 
+   * @param {Event} ev 
+   */
+  function buttonPressed (id) {
+    switch (id){
+      case "Up":
+        document.dispatchEvent(new KeyboardEvent("keydown", {key: "w"}));
+        break;
+      case "Down":
+        document.dispatchEvent(new KeyboardEvent("keydown", {key: "s"}));
+        break;
+      case "Left":
+        document.dispatchEvent(new KeyboardEvent("keydown", {key: "a"}));
+        break;
+      case "Right":
+        document.dispatchEvent(new KeyboardEvent("keydown", {key: "d"}));
+        break;
+    }
+  }
+
+  let touchKey = null;
+  document.getElementById("Up").ontouchstart = 
+  document.getElementById("Down").ontouchstart = 
+  document.getElementById("Left").ontouchstart = 
+  document.getElementById("Right").ontouchstart = (ev) => {
+    buttonPressed(ev.currentTarget.id);
+    touchKey = ev.currentTarget.id;
+  }
+
+  document.getElementById("Up").ontouchend = 
+  document.getElementById("Down").ontouchend = 
+  document.getElementById("Left").ontouchend = 
+  document.getElementById("Right").ontouchend = (ev) => {
+    touchKey = null;
+  }
+
+  window.setInterval(() => {
+    if (touchKey) buttonPressed(touchKey);
+  }, 100);
+
+
+  document.getElementById("Mine").onclick = (ev) => {
+    canvas.onmousedown(new MouseEvent("left", {button: 0}));
+  };
+  document.getElementById("Place").onclick = (ev) => {
+    canvas.onmousedown(new MouseEvent("right", {button: 2}));
+  };
+
+  // ----------------------------
+
 
   gl.uniform1i(gld.u_depthTexSize, lightSize)
   wObj.cull(camera);
@@ -529,7 +609,7 @@ function terrainHeight(x, y){
 
 function init_world(){
 
-  const wallHeight = 10;
+  const wallHeight = 20;
   world[0] = Array(32).fill(wallHeight);
   world[31] = Array(32).fill(wallHeight);
   for (var y = 0; y < world.length; y++){
@@ -537,7 +617,7 @@ function init_world(){
     world[y][31] = wallHeight;
   }
 
-  let padding = (fullWorldSize - world.length) / 2;
+  let padding = Math.floor((fullWorldSize - world.length) / 2);
   let newWorld = [];
   for (let y = 0; y < fullWorldSize; y++){
     newWorld.push([])
@@ -552,7 +632,7 @@ function init_world(){
 
   world = newWorld
   // [[1, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
-  wObj = new World(newWorld, cubeSize);
+  wObj = new World(newWorld, cubeSize, padding);
 
   ground = new TexCube(new Matrix4(), null, [world[0].length * cubeSize, 0.1, world.length * cubeSize]);
   ground.uvs = ground.uvs.map((i) => i * world[0].length * cubeSize);

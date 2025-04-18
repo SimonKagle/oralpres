@@ -4,7 +4,7 @@ class World {
      * World Constructor
      * @param {Number[][]} blockHeights Heights of each block tower in the world
      */
-    constructor (blockHeights, cubeSize){
+    constructor (blockHeights, cubeSize, padding){
         /**@type {Number} */
         this.block_count = 0;
         this.total_blocks = 0;
@@ -13,12 +13,17 @@ class World {
         for (var z = 0; z < blockHeights.length; z++){
             this.cubes.push([]);
             for (var x = 0; x < blockHeights[z].length; x++){
-                this.cubes[z].push(Array(blockHeights[z][x]).fill(6).map((_, i) => {
-                    if (i == blockHeights[z][x] - 1) return 2;
-                    if (blockHeights[z][x] - i < 4) return 3;
-                    return 6;
-                }));
-                if (this.cubes[z][x].length > 0) this.cubes[z][x][this.cubes[z][x].length - 1] = 2;
+                if (x >= padding && z >= padding && x < padding + 32 && z < padding + 32){
+                    this.cubes[z].push(Array(blockHeights[z][x]).fill(1))
+                } else {
+                    this.cubes[z].push(Array(blockHeights[z][x]).fill(6).map((_, i) => {
+                        if (i == blockHeights[z][x] - 1) return 2;
+                        if (blockHeights[z][x] - i < 4) return 3;
+                        return 6;
+                    }));
+                    // this.cubes[z].push(Array(blockHeights[z][x]).fill(1))
+                    if (this.cubes[z][x].length > 0) this.cubes[z][x][this.cubes[z][x].length - 1] = 2;
+                }
                 // if(this.cubes[z].length > 0) this.cubes[z][this.cubes[z].length - 1] = 2;
                 this.block_count += blockHeights[z][x];
             }
@@ -32,10 +37,12 @@ class World {
         this.cubeSize = cubeSize;
         this.inst = new TexCube(new Matrix4(), null, new Array(3).fill(this.cubeSize));
         
-        /** @type {Float32Array} */
+        /** @type {Int16Array} */
         this.offset_cache = null;
         this.offset_buffer_stale = true;
         this.offsetBuffer = null;
+
+        this.culledOffsets = null;
 
         this.uvOffset_cache = null;
         this.uvOffsetBuffer = null;
@@ -45,7 +52,7 @@ class World {
         this.normalBuffer = null;
     }
 
-    render(gl, a_Position, a_UV, u_Matrix){
+    render(gl, a_Position, a_UV, u_Matrix, u_NormalMatrix){
         this.block_count = 0;
         for (var z = 0; z < this.cubes.length; z++){
             for (var x = 0; x < this.cubes[z].length; x++){
@@ -55,7 +62,7 @@ class World {
                             (x - this.cubes[z].length / 2) * 2 * this.cubeSize, 
                             y * 2 * this.cubeSize, 
                             (z - this.cubes.length / 2) * 2 * this.cubeSize);
-                        this.inst.render(gl, a_Position, a_UV, u_Matrix);
+                        this.inst.render(gl, a_Position, a_UV, u_Matrix, u_NormalMatrix);
                         this.block_count++;
                     }
                 }
@@ -198,6 +205,7 @@ class World {
 
         this.offset_buffer_stale = true;
         this.total_blocks += isBlock ? 1 : -1;
+
     }
 
     /**
@@ -205,6 +213,26 @@ class World {
      * @param {Camera} camera Current camera
      */
     cull(camera){
+
+        // if (this.offset_cache === null){
+        //     this.fillOffsetCache();
+        // }
+
+        // this.culledOffsets = new Int16Array(this.offset_cache.length);
+        // for (let i = 0; i < this.offset_cache.length; i += 4){
+        //     let [x, y, z, w] = this.offset_cache.slice(i, i + 4);
+        //     let [ex, ey, ez] = camera.eye.elements;
+        //     let [ax, ay, az] = camera.at.elements;
+        //     let dp = (x - ex) * (ax - ex) + (y - ey) * (ay - ey) + (z - ez) * (az - ez);
+        //     if (dp > 0){
+        //         this.culledOffsets[i + 0] = x;
+        //         this.culledOffsets[i + 1] = y;
+        //         this.culledOffsets[i + 2] = z;
+        //         this.culledOffsets[i + 3] = w;
+        //     }
+        // }
+        // this.culledOffsets = new Int16Array(this.culledOffsets);
+
         // TODO: Maybe only do this on offset cache?
         /*
         this.block_count = 0
@@ -384,8 +412,9 @@ class World {
         this.fillOffsetCache(gl, gld);
 
         gl.bindBuffer(gl.ARRAY_BUFFER, this.offsetBuffer);
+        // gl.bufferData(gl.ARRAY_BUFFER, this.culledOffsets, gl.STREAM_DRAW);
         if (this.offset_buffer_stale){
-            gl.bufferData(gl.ARRAY_BUFFER, this.offset_cache.subarray(0, this.block_count * 4), gl.STREAM_DRAW);
+            gl.bufferData(gl.ARRAY_BUFFER, this.offset_cache, gl.STREAM_DRAW);
         }
 
         gl.vertexAttribIPointer(gld.a_offset, 4, gl.SHORT, false, 0, 0);

@@ -267,10 +267,9 @@ let acc_frame_time = 0;
 const lightSize = 1 << 12;
 //[1, .7, .2, 1]
 let light = new Light(new Vector4([.6, .6, .6, 1]), new Camera(1, true, 200));
-light.camera.move(0, 50, 0);
+light.camera.move(100, 50, 100);
 light.camera.panUp(45);
 light.camera.panRight(45);
-light.camera.moveBackwards(250);
 
 
 var fullWorldSize = 200;
@@ -567,7 +566,7 @@ function main() {
   canvas.addEventListener("touchstart", (ev) => {
     xStart = ev.touches[0].clientX;
     yStart = ev.touches[0].clientY;
-  }, {passive: true});
+  }, {passive: false});
 
   canvas.addEventListener("touchmove", (ev) => {
     if (!xStart || !yStart){
@@ -584,7 +583,7 @@ function main() {
 
     xStart = newX;
     yStart = newY;
-  }, {passive: true});
+  }, {passive: false});
 
 
   /**
@@ -609,23 +608,37 @@ function main() {
   }
 
   let touchKey = null;
+  let touchKeyEnd = false;
+  // document.getElementById("Up").onmousedown = 
+  // document.getElementById("Down").onmousedown = 
+  // document.getElementById("Left").onmousedown = 
+  // document.getElementById("Right").onmousedown =
   document.getElementById("Up").ontouchstart = 
   document.getElementById("Down").ontouchstart = 
   document.getElementById("Left").ontouchstart = 
   document.getElementById("Right").ontouchstart = (ev) => {
-    buttonPressed(ev.currentTarget.id);
+    // buttonPressed(ev.currentTarget.id);
     touchKey = ev.currentTarget.id;
   }
 
+  // document.getElementById("Up").onmouseup = 
+  // document.getElementById("Down").onmouseup = 
+  // document.getElementById("Left").onmouseup = 
+  // document.getElementById("Right").onmouseup =
   document.getElementById("Up").ontouchend = 
   document.getElementById("Down").ontouchend = 
   document.getElementById("Left").ontouchend = 
   document.getElementById("Right").ontouchend = (ev) => {
-    touchKey = null;
+    touchKeyEnd = true;
   }
 
   window.setInterval(() => {
-    if (touchKey) buttonPressed(touchKey);
+    if (touchKey !== null) buttonPressed(touchKey);
+    if (touchKeyEnd){
+      console.log(touchKey, touchKeyEnd);
+      touchKey = null;
+      touchKeyEnd = false;
+    }
   }, 100);
 
 
@@ -662,6 +675,8 @@ function terrainHeight(x, y){
 }
 
 function init_world(){
+
+  // light.camera.move(fullWorldSize / 2, 50, fullWorldSize / 2);
 
   const wallHeight = 20;
   world[0] = Array(32).fill(wallHeight);

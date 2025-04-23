@@ -248,6 +248,7 @@ var world = [
   [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
 ];
 
+/** @type {World} */
 var wObj = null;
 const cubeSize = .5;
 var mouseSensitivity = 0.5;
@@ -264,8 +265,9 @@ let ground = new TexCube(new Matrix4().translate(0, -5, 0).scale(10, 1, 10), nul
 
 let acc_frame_time = 0;
 
-const lightSize = 1 << 12;
-//[1, .7, .2, 1]
+const lightSize = 1 << 14;
+
+/** @type {Light} */
 let light = new Light(new Vector4([.6, .6, .6, 1]), new Camera(1, true, 200));
 light.camera.move(100, 50, 100);
 light.camera.panUp(45);
@@ -608,37 +610,28 @@ function main() {
   }
 
   let touchKey = null;
-  let touchKeyEnd = false;
-  // document.getElementById("Up").onmousedown = 
-  // document.getElementById("Down").onmousedown = 
-  // document.getElementById("Left").onmousedown = 
-  // document.getElementById("Right").onmousedown =
   document.getElementById("Up").ontouchstart = 
   document.getElementById("Down").ontouchstart = 
   document.getElementById("Left").ontouchstart = 
   document.getElementById("Right").ontouchstart = (ev) => {
-    // buttonPressed(ev.currentTarget.id);
+    buttonPressed(ev.currentTarget.id);
     touchKey = ev.currentTarget.id;
   }
 
-  // document.getElementById("Up").onmouseup = 
-  // document.getElementById("Down").onmouseup = 
-  // document.getElementById("Left").onmouseup = 
-  // document.getElementById("Right").onmouseup =
   document.getElementById("Up").ontouchend = 
   document.getElementById("Down").ontouchend = 
   document.getElementById("Left").ontouchend = 
   document.getElementById("Right").ontouchend = (ev) => {
-    touchKeyEnd = true;
+    touchKey = null;
   }
 
   window.setInterval(() => {
     if (touchKey !== null) buttonPressed(touchKey);
-    if (touchKeyEnd){
-      console.log(touchKey, touchKeyEnd);
-      touchKey = null;
-      touchKeyEnd = false;
-    }
+    // if (touchKeyEnd){
+    //   console.log(touchKey, touchKeyEnd);
+    //   touchKey = null;
+    //   touchKeyEnd = false;
+    // }
   }, 100);
 
 
@@ -674,9 +667,30 @@ function terrainHeight(x, y){
   return Math.max(0, n);
 }
 
-function init_world(){
+function setLightPos(){
+  let worldBounds = wObj.getAABBPoints();
 
-  // light.camera.move(fullWorldSize / 2, 50, fullWorldSize / 2);
+  light.camera.goTo(fullWorldSize / 2, fullWorldSize / 4, fullWorldSize / 2);
+
+  let lightAABB = [[1000, 0], [1000, 0], [1000, 0]];
+  for (let i = 0; i < worldBounds.length; i++){
+    let bound = worldBounds[i];
+    let transBound = light.camera.viewMatrix.multiplyVector3(bound).elements;
+    for (let j = 0; j < lightAABB.length; j++){
+      lightAABB[j][0] = Math.min(transBound[j], lightAABB[j][0]);
+      lightAABB[j][1] = Math.max(transBound[j], lightAABB[j][1])
+    }
+
+    console.log(bound, transBound);
+  }
+
+  console.log(lightAABB)
+
+  light.camera.projectionMatrix.setOrtho(...lightAABB[0], ...lightAABB[1], lightAABB[2][0], lightAABB[2][1] * 2);
+
+}
+
+function init_world(){
 
   const wallHeight = 20;
   world[0] = Array(32).fill(wallHeight);
@@ -702,6 +716,9 @@ function init_world(){
   // world = newWorld
   // [[1, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
   wObj = new World(newWorld, cubeSize, padding);
+
+  setLightPos();
+
 
   
 }

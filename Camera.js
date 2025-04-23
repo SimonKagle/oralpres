@@ -108,14 +108,14 @@ class Camera {
         this.eye.add(total);
         this.at.add(total);
 
-        this.viewMatrix.setLookAt(
-            ...this.eye.elements,
-            ...this.at.elements,
-            ...this.up.elements
-        );
+        this.#postMove();
+    }
 
-        this.frustumPoints = null;
-        this.frustumPlanes = null;
+    goTo(x, y, z){
+        let delta = new Vector3([x, y, z]).sub(this.eye).mul(1);
+        this.at.add(delta);
+        this.eye.add(delta);
+        this.#postMove();
     }
 
     #pan(x, y){
@@ -133,6 +133,10 @@ class Camera {
         lookDir.add(this.eye);
         this.at = lookDir;
 
+        this.#postMove();
+    }
+
+    #postMove(){
         this.viewMatrix.setLookAt(
             ...this.eye.elements,
             ...this.at.elements,

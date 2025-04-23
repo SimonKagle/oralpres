@@ -209,6 +209,26 @@ class World {
 
     }
 
+    getAABBPoints(){
+        let max = [0, 0, this.cubes.length];
+        for (let z = 0; z < this.cubes.length; z++){
+            if (max[0] < this.cubes[z].length) max[0] = this.cubes[z].length;
+            for (let x = 0; x < this.cubes[z].length; x++){
+                if (max[1] < this.cubes[z][x].length) max[1] = this.cubes[z][x].length;
+            }
+        }
+        
+        let out = [];
+        for (let i = 0; i < (1 << 3); i++){
+            let gx = i & 1 ? 0 : max[0] - 1;
+            let gy = i & 2 ? 0 : max[1] - 1;
+            let gz = i & 4 ? 0 : max[2] - 1;
+            out.push(new Vector3(this.grid2point(gx, gy, gz)));
+        }
+
+        return out;
+    }
+
     /**
      * Removes all cubes not in frustum
      * @param {Camera} camera Current camera

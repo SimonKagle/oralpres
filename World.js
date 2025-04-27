@@ -9,37 +9,46 @@ class World {
         this.block_count = 0;
         this.total_blocks = 0;
         /**@type {number[][][]} */
-        this.cubes = [];
+        this.cubes = []
+        console.log(this.cubes);
+        this.cubeSize = cubeSize;
+
+
+        let visible = [];
         for (var z = 0; z < blockHeights.length; z++){
-            this.cubes.push([]);
+            this.cubes.push([])
             for (var x = 0; x < blockHeights[z].length; x++){
-                if (x >= padding && z >= padding && x < padding + 32 && z < padding + 32){
-                    this.cubes[z].push(Array(blockHeights[z][x]).fill(1))
-                } else {
-                    this.cubes[z].push(Array(blockHeights[z][x]).fill(6).map((_, i) => {
-                        if (i == blockHeights[z][x] - 1) return 2;
-                        if (blockHeights[z][x] - i < 4) return 3;
-                        return 6;
-                    }));
-                    // this.cubes[z].push(Array(blockHeights[z][x]).fill(1))
-                    if (this.cubes[z][x].length > 0) this.cubes[z][x][this.cubes[z][x].length - 1] = 2;
+                this.cubes[z].push(makeColumn(x, z, blockHeights[z][x], padding))
+                // this.cubes[z][x].push(makeColumn(x, z, blockHeights[z][x], padding))
+                this.block_count += this.cubes[z][x].length;
+
+                let minNeighborHeight = Math.min(
+                    z - 1 >= 0 ? blockHeights[z - 1][x] : 0,
+                    z + 1 < blockHeights.length ? blockHeights[z + 1][x] : 0,
+                    blockHeights[z][x - 1] || 0,
+                    blockHeights[z][x + 1] || 0,
+                );
+
+                visible.push(...this.grid2point(x, this.cubes[z][x].length - 1, z, blockHeights), this.cubes[z][x].at(-1) - 1);
+                    
+                for (let i = minNeighborHeight + 1; i < this.cubes[z][x].length - 1; i++){
+                    visible.push(...this.grid2point(x, i, z, blockHeights), this.cubes[z][x][i] - 1);
                 }
-                this.cubes[z][x].unshift(2);
-                // if(this.cubes[z].length > 0) this.cubes[z][this.cubes[z].length - 1] = 2;
-                this.block_count += blockHeights[z][x];
+
             }
         }
 
 
         this.total_blocks = this.block_count;
+        this.block_count = visible.length / 4;
         console.log("Object done");
 
 
-        this.cubeSize = cubeSize;
         this.inst = new TexCube(new Matrix4(), null, new Array(3).fill(this.cubeSize));
         
         /** @type {Int16Array} */
-        this.offset_cache = null;
+        this.offset_cache = new Int16Array(visible);
+        // console.log(visible);
         this.offset_buffer_stale = true;
         this.offsetBuffer = null;
 
@@ -51,6 +60,8 @@ class World {
         this.uvBuffer = null;
         this.vertexBuffer = null;
         this.normalBuffer = null;
+
+        console.log("Done");
     }
 
     render(gl, a_Position, a_UV, u_Matrix, u_NormalMatrix){
@@ -79,11 +90,11 @@ class World {
         ];
     }
 
-    grid2point(gx, gy, gz){
+    grid2point(gx, gy, gz, subst){
         return [
-            (gx - this.cubes[gz].length / 2) * 2 * this.cubeSize, 
+            (gx - (subst ? subst[gz] : this.cubes[gz]).length / 2) * 2 * this.cubeSize, 
             gy * 2 * this.cubeSize, 
-            (gz - this.cubes.length / 2) * 2 * this.cubeSize
+            (gz - (subst || this.cubes).length / 2) * 2 * this.cubeSize
         ];
     }
 

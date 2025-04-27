@@ -30,6 +30,14 @@ out vec4 v_projVertPos;
 
 uniform int u_doingInstances;
 void main() {
+
+  // if (u_doingInstances == 1 && 
+  //  (any(lessThan(vec3(a_offset) + vec3(.5), u_minAABB)) || 
+  //   any(greaterThan(vec3(a_offset) - vec3(.5), u_maxAABB)))){
+  //    gl_Position = vec4(vec3(2.), 1);
+  //    return;
+  //  }
+
   v_vertPos = u_doingInstances == 1 ? (a_Position + vec4(a_offset.xyz, 0)) : u_ModelMatrix * a_Position;
   v_Normal = a_Normal;
   v_UV = vec2(a_UV.x, a_UV.y);
@@ -265,7 +273,7 @@ let ground = new TexCube(new Matrix4().translate(0, -5, 0).scale(10, 1, 10), nul
 
 let acc_frame_time = 0;
 
-const lightSize = 1 << 14;
+var lightSize = 1 << 11;
 
 /** @type {Light} */
 let light = new Light(new Vector4([.6, .6, .6, 1]), new Camera(1, true, 200));
@@ -424,6 +432,8 @@ function main() {
 
 
   var [gl, canvas] = setupWebGL();
+
+  lightSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
 
   init_world();
 
@@ -686,7 +696,7 @@ function setLightPos(){
 
   console.log(lightAABB)
 
-  light.camera.projectionMatrix.setOrtho(...lightAABB[0], ...lightAABB[1], lightAABB[2][0], lightAABB[2][1] * 2);
+  light.camera.projectionMatrix.setOrtho(...lightAABB[0], ...lightAABB[1], lightAABB[2][0], lightAABB[2][1] - lightAABB[2][0]);
 
 }
 
@@ -826,9 +836,9 @@ function renderScene(gl){
   // ground.render(gl, gld.a_Position, gld.a_Normal, gld.a_UV, gld.u_ModelMatrix, gld.u_NormalMatrix);
   gl.uniform1i(gld.u_colorSrc, 3);
 
-  // let [minPt, maxPt] = camera.getAABB();
-  // gl.uniform3fv(gld.u_maxAABB, maxPt.elements);
-  // gl.uniform3fv(gld.u_minAABB, minPt.elements);
+  let [minPt, maxPt] = camera.getAABB();
+  gl.uniform3fv(gld.u_maxAABB, maxPt.elements);
+  gl.uniform3fv(gld.u_minAABB, minPt.elements);
   wObj.renderFast(gl, ext, gld);
 
   let curr_frame_time = performance.now() - start

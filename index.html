@@ -14,13 +14,12 @@
     <br>
     <input type="number" id="remakeSize">
     <button id="remake">Remake world at this size</button>
-    <br><br>
-    By Simon Kagle - skagle@ucsc.edu<br>
-    If on a computer, use WASD and Mouse to move, left click to mine, and right click to place.
-    <br> If on a phone, swipe on the screen to look around use the buttons below. 
-    <br> To make the world larger or smaller, enter the new world size and press the button next to the field. 
-    It may take a second to load, and the number of blocks grows quadratically. Be careful!
-    <br><br>
+    <select name="shading-level" id="shading">
+      <option value="2">Shadow mapping + Phong</option>
+      <option value="1">Phong Only</option>
+      <option value="0">No shading</option>
+    </select>
+    <br>
     <span>
       <br>
       avg. frame time: <span id="frameTime">(calculating...) </span>ms
@@ -31,6 +30,13 @@
       <br>
       total block count: <span id="totalCount"></span> blocks
     </span>
+    <br><br>
+    By Simon Kagle - skagle@ucsc.edu<br>
+    If on a computer, use WASD and Mouse to move, left click to mine, and right click to place.
+    <br> If on a phone, swipe on the screen to look around use the buttons below. 
+    <br> To make the world larger or smaller, enter the new world size and press the button next to the field. 
+    It may take a second to load, and the number of blocks grows quadratically. Be careful!
+    <br><br>
     <br><br>
 
     <div id="buttons">

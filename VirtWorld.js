@@ -66,6 +66,7 @@ uniform highp sampler2DShadow u_depthTex;
 uniform int u_colorSrc;
 
 uniform bool u_isDepth;
+uniform int u_shadingLevel;
 
 in vec3 v_lightPos;
 in vec4 v_illumination;
@@ -141,12 +142,18 @@ void main() {
   vec3 cameraVector = normalize(u_cameraPos - vec3(v_vertPos));
   vec3 halfway = normalize(lightVector + cameraVector);
   fragColor = k_ambient;
-  if (!u_doingShadowMap){
+  if (u_shadingLevel > 1){
     fragColor += (1. - shadowAmnt(projPoint.xyz)) * v_diffuse;
+  } else {
+    fragColor += v_diffuse;
   }
   // fragColor += v_diffuse;
   // fragColor += k_specular * v_illumination * pow(max(0., dot(normalize(v_Normal), halfway)), n_specular);
-  fragColor *= baseColor;
+  if (u_shadingLevel != 0){
+    fragColor *= baseColor;
+  } else {
+    fragColor = baseColor; 
+  }
 }`;
 
 var shadowShaders = [
@@ -211,6 +218,7 @@ let gld = {
   u_CamViewMatrix: null,
   u_depthTexSize: null,
   u_doingShadowMap: null,
+  u_shadingLevel: null,
 };
 
 /** @type {Camera} */
@@ -440,36 +448,6 @@ function main() {
   gl.enable(gl.DEPTH_TEST);
   gl.enable(gl.CULL_FACE);
   gl.clearColor(.9/2, .75/2, .8/2, 1.0);
-  // gl.clearColor(200/255, 87/255, 51/255, 1)
-
-  // ext = gl.getExtension('ANGLE_instanced_arrays');
-  // if (!ext) {
-  //   throw new Error("Could not get extension ''ANGLE_instanced_arrays''");
-  // }
-
-  // ext2 = gl.getExtension("WEBGL_depth_texture");
-  // if (!ext2){
-  //   throw new Error("Could not get extension 'WEBGL_depth_texture'");
-  // }
-
-  // ext2 = gl.getExtension('GMAN_webgl_memory');
-  // if (!ext) {
-  //   throw Error("Could not get extension 'GMAN_webgl_memory'");
-  // }
-
-  // setInterval(() => console.log(ext2.getMemoryInfo()), 2000);
-
-  
-  // [[a_Position, a_UV, a_offset, a_Normal], 
-  //   [u_FragColor, u_ModelMatrix, u_ViewMatrix, 
-  //    u_ProjectionMatrix, u_Sampler0, u_ColorSrc,
-  //    u_Sampler1, u_doingInstances, u_minAABB, u_maxAABB,
-  //    u_lightPos, u_cameraPos, u_illumination]] = connectVariablesToGLSL(
-  //     gl, ["a_Position", "a_UV", "a_offset", "a_Normal"], 
-  //     ["u_FragColor", "u_ModelMatrix", "u_ViewMatrix", 
-  //      "u_ProjectionMatrix", "u_Sampler0", "u_colorSrc", "u_Sampler1",
-  //      "u_doingInstances", "u_minAABB", "u_maxAABB", "u_lightPos", "u_cameraPos", "u_illumination"]
-  // );
 
   mainShader = createProgram(gl, VSHADER_SOURCE, FSHADER_SOURCE);
   if (!mainShader){
@@ -499,6 +477,11 @@ function main() {
 
   // Clear <canvas>
   clearCanvas(gl);
+  const shadingSelector = document.getElementById("shading");
+  gl.uniform1i(gld.u_shadingLevel, ~~shadingSelector.value);
+  shadingSelector.onchange = (e) => {
+    gl.uniform1i(gld.u_shadingLevel, ~~e.target.value);
+  }
 
   document.onkeydown = function(ev){
     switch (ev.key){
